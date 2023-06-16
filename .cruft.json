@@ -1,0 +1,24 @@
+{
+  "template": "https://github.com/monarch-initiative/monarch-project-template",
+  "commit": "7a5148b11fd6f4f70da7ef921789e0d5fe720e01",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "monarch-assistant",
+      "github_org_name": "monarch-initiative",
+      "__project_slug": "monarch_assistant",
+      "project_description": "A langchain-based AI assistant for the Monarch knowledge graph.",
+      "min_python_version": "3.9",
+      "file_name": "main",
+      "greeting_recipient": "World",
+      "full_name": "Shawn T. O'Neil",
+      "email": "shawn@tislab.org",
+      "__author": "Shawn T. O'Neil <shawn@tislab.org>",
+      "license": "MIT",
+      "github_token_for_doc_deployment": "GH_TOKEN",
+      "github_token_for_pypi_deployment": "PYPI_TOKEN",
+      "_template": "https://github.com/monarch-initiative/monarch-project-template"
+    }
+  },
+  "directory": null
+}
