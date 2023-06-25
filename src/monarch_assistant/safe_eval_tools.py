@@ -28,6 +28,7 @@ class SafeEval:
         for method in methods:
             self.interpreter.symtable[method] = getattr(self, method)
 
+
     def evaluate(self, expression: str) -> str:
         """Evaluates the given expression using the interpreter's symbol table."""
         try:
@@ -35,82 +36,219 @@ class SafeEval:
         except Exception as e:
             return f"Error: {e}. Are you trying to use functionality that is not available?"
 
+
+    def generate_function_schemas(self):
+        """Generates a list of JSON schemas describing the safe functions."""
+        function_schemas = []
+        # Get all methods of the class
+        methods = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("_")]
+        # Iterate over the methods and build the schema for each
+        for method_name in methods:
+            method = getattr(self, method_name)
+            if hasattr(method, "schema"):
+                function_schemas.append(method.schema)
+
+        return function_schemas
+
+
+    def get_function(self, name: str):
+        """Returns the function with the given name."""
+        return getattr(self, name)
+
+
     def echo(self, x):
-        """Returns the given input."""
+        """Returns the given input string."""
         return x
+    echo.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'x': {'type': 'string', 'description': 'The input to return'}
+            }
+        },
+        "name": "echo",
+        "description": "Returns the given input string.",
+        "required": ["x"]
+    }
 
     def time(self):
         """Returns the current time."""
         now = datetime.now()
         formatted_now = now.strftime("%m/%d/%y %H:%M")
         return formatted_now
+    time.schema = {
+        "parameters": {        
+            "type": "object",
+            "properties": {}
+        },
+        "name": "time",
+        "description": "Returns the current time."
+    }
 
     def entropy(self, lst):
         """Returns the entropy of the given list."""
         counter = Counter(lst)
         probabilities = [count/len(lst) for count in counter.values()]
         return -sum(p * log2(p) for p in probabilities)
-    
-    # endpoints: {"openapi":"3.0.2","info":{"url": "http://localhost:3434/", "title":"Monarch","version":"0.1.0"},"paths":{"/search":{"get":{"summary":"Search for entities in the Monarch knowledge graph","description":"Search for entities in the Monarch knowledge graph","operationId":"search_entity","parameters":[{"description":"The ontology term to search for.","required":true,"schema":{"title":"Term","type":"string","description":"The ontology term to search for."},"name":"term","in":"query"},{"description":"A single category to search within as a string. Valid categories are: biolink:Disease, biolink:PhenotypicQuality, and biolink:Gene","required":false,"schema":{"title":"Category","type":"string","description":"A single category to search within as a string. Valid categories are: biolink:Disease, biolink:PhenotypicQuality, and biolink:Gene","default":"biolink:Disease"},"example":"biolink:Disease","name":"category","in":"query"},{"description":"The maximum number of search results to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of search results to return.","default":2},"name":"limit","in":"query"},{"description":"Offset for pagination of results","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"Search results for the given ontology term","content":{"application/json":{"schema":{"$ref":"#/components/schemas/SearchResultItems"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/disease-genes":{"get":{"summary":"Get a list of genes associated with a disease","description":"Get a list of genes associated with a disease","operationId":"get_disease_gene_associations","parameters":[{"description":"The ontology identifier of the disease.","required":true,"schema":{"title":"Disease Id","type":"string","description":"The ontology identifier of the disease."},"example":"MONDO:0009061","name":"disease_id","in":"query"},{"description":"The maximum number of associations to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of associations to return.","default":10},"name":"limit","in":"query"},{"description":"Offset for pagination of results","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A GeneAssociations object containing a list of GeneAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GeneAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/disease-phenotypes":{"get":{"summary":"Get a list of phenotypes associated with a disease","description":"Get a list of phenotypes associated with a disease","operationId":"get_disease_phenotype_associations","parameters":[{"description":"The ontology identifier of the disease.","required":true,"schema":{"title":"Disease Id","type":"string","description":"The ontology identifier of the disease."},"example":"MONDO:0009061","name":"disease_id","in":"query"},{"description":"The maximum number of associations to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of associations to return.","default":10},"name":"limit","in":"query"},{"description":"Offset for pagination of results.","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results.","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A PhenotypeAssociations object containing a list of PhenotypeAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PhenotypeAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/gene-diseases":{"get":{"summary":"Get a list of diseases associated with a gene","description":"Get a list of diseases associated with a gene","operationId":"get_gene_disease_associations","parameters":[{"description":"The ontology identifier of the gene.","required":true,"schema":{"title":"Gene Id","type":"string","description":"The ontology identifier of the gene."},"example":"HGNC:1884","name":"gene_id","in":"query"},{"description":"The maximum number of associations to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of associations to return.","default":10},"name":"limit","in":"query"},{"description":"Offset for pagination of results","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A DiseaseAssociations object containing a list of DiseaseAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiseaseAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/gene-phenotypes":{"get":{"summary":"Get a list of phenotypes associated with a gene","description":"Get a list of phenotypes associated with a gene","operationId":"get_gene_phenotype_associations","parameters":[{"description":"The ontology identifier of the gene.","required":true,"schema":{"title":"Gene Id","type":"string","description":"The ontology identifier of the gene."},"example":"HGNC:1884","name":"gene_id","in":"query"},{"description":"The maximum number of associations to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of associations to return.","default":10},"name":"limit","in":"query"},{"description":"Offset for pagination of results","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A PhenotypeAssociations object containing a list of PhenotypeAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PhenotypeAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/phenotype-diseases":{"get":{"summary":"Get a list of diseases associated with a phenotype","description":"Get a list of diseases associated with a phenotype","operationId":"get_phenotype_disease_associations","parameters":[{"description":"The ontology identifier of the phenotype.","required":true,"schema":{"title":"Phenotype Id","type":"string","description":"The ontology identifier of the phenotype."},"example":"HP:0002721","name":"phenotype_id","in":"query"},{"required":false,"schema":{"title":"Limit","type":"integer","default":10},"name":"limit","in":"query"},{"required":false,"schema":{"title":"Offset","type":"integer","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A DiseaseAssociations object containing a list of DiseaseAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiseaseAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/phenotype-genes":{"get":{"summary":"Get a list of genes associated with a phenotype","description":"Get a list of genes associated with a phenotype","operationId":"get_phenotype_gene_associations","parameters":[{"description":"The ontology identifier of the phenotype.","required":true,"schema":{"title":"Phenotype Id","type":"string","description":"The ontology identifier of the phenotype."},"example":"HP:0002721","name":"phenotype_id","in":"query"},{"description":"The maximum number of associations to return.","required":false,"schema":{"title":"Limit","type":"integer","description":"The maximum number of associations to return.","default":10},"name":"limit","in":"query"},{"description":"Offset for pagination of results","required":false,"schema":{"title":"Offset","type":"integer","description":"Offset for pagination of results","default":1},"name":"offset","in":"query"}],"responses":{"200":{"description":"A GeneAssociations object containing a list of GeneAssociation objects","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GeneAssociations"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}}},"components":{"schemas":{"Disease":{"title":"Disease","required":["id","label"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the disease.","example":"MONDO:0009061"},"label":{"title":"Label","type":"string","description":"The human-readable label of the disease.","example":"cystic fibrosis"}}},"DiseaseAssociation":{"title":"DiseaseAssociation","required":["id","disease"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the association."},"disease":{"$ref":"#/components/schemas/Disease"}}},"DiseaseAssociations":{"title":"DiseaseAssociations","required":["associations","total"],"type":"object","properties":{"associations":{"title":"Associations","type":"array","items":{"$ref":"#/components/schemas/DiseaseAssociation"},"description":"The list of DiseaseAssociation objects."},"total":{"title":"Total","type":"integer","description":"The total number of disease associations available."}}},"Gene":{"title":"Gene","required":["id","label"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the gene.","example":"HGNC:1884"},"label":{"title":"Label","type":"string","description":"The human-readable label of the gene.","example":"CFTR"}}},"GeneAssociation":{"title":"GeneAssociation","required":["id","gene"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the association."},"gene":{"$ref":"#/components/schemas/Gene"}}},"GeneAssociations":{"title":"GeneAssociations","required":["associations","total"],"type":"object","properties":{"associations":{"title":"Associations","type":"array","items":{"$ref":"#/components/schemas/GeneAssociation"},"description":"The list of GeneAssociation objects."},"total":{"title":"Total","type":"integer","description":"The total number of gene associations available."}}},"HTTPValidationError":{"title":"HTTPValidationError","type":"object","properties":{"detail":{"title":"Detail","type":"array","items":{"$ref":"#/components/schemas/ValidationError"}}}},"Phenotype":{"title":"Phenotype","required":["id","label"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the phenotype.","example":"HP:0002721"},"label":{"title":"Label","type":"string","description":"The human-readable label of the phenotype.","example":"Immunodeficiency"}}},"PhenotypeAssociation":{"title":"PhenotypeAssociation","required":["id","phenotype"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the association."},"frequency_qualifier":{"title":"Frequency Qualifier","type":"string","description":"The frequency qualifier of the association."},"onset_qualifier":{"title":"Onset Qualifier","type":"string","description":"The onset qualifier of the association."},"phenotype":{"$ref":"#/components/schemas/Phenotype"}}},"PhenotypeAssociations":{"title":"PhenotypeAssociations","required":["associations","total"],"type":"object","properties":{"associations":{"title":"Associations","type":"array","items":{"$ref":"#/components/schemas/PhenotypeAssociation"},"description":"The list of PhenotypeAssociation objects."},"total":{"title":"Total","type":"integer","description":"The total number of phenotype associations available."}}},"SearchResultItem":{"title":"SearchResultItem","required":["id","name","categories"],"type":"object","properties":{"id":{"title":"Id","type":"string","description":"The ontology identifier of the search result.","example":"MONDO:0009061"},"name":{"title":"Name","type":"string","description":"The name of the search result.","example":"cystic fibrosis"},"categories":{"title":"Categories","type":"array","items":{"type":"string"},"description":"The categories of the search result.","example":["biolink:Disease"]},"description":{"title":"Description","type":"string","description":"The description of the search result.","example":"Cystic fibrosis (CF) is a genetic disorder characterized by the production of sweat with a high salt content and mucus secretions with an abnormal viscosity."}}},"SearchResultItems":{"title":"SearchResultItems","required":["results","total"],"type":"object","properties":{"results":{"title":"Results","type":"array","items":{"$ref":"#/components/schemas/SearchResultItem"},"description":"A list of SearchResultItem objects."},"total":{"title":"Total","type":"integer","description":"The total number of search results available."}}},"ValidationError":{"title":"ValidationError","required":["loc","msg","type"],"type":"object","properties":{"loc":{"title":"Location","type":"array","items":{"anyOf":[{"type":"string"},{"type":"integer"}]}},"msg":{"title":"Message","type":"string"},"type":{"title":"Error Type","type":"string"}}}}}}
-
-    
+    entropy.schema = {
+        "parameters": {
+        "type": "object",
+        "properties": {
+            'lst': {'type': 'array', 
+                    'description': 'The list to calculate the entropy of.', 
+                    'items': {'type': 'number'}}
+            }
+        },
+        "name": "entropy",
+        "description": "Returns the entropy of the given list.",
+        "required": ["lst"]
+    }
 
     def search_monarch(self, term: str, category: Literal["biolink:Disease", "biolink:PhenotypicQuality", "biolink:Gene"] = "biolink:Disease", limit: Optional[int] = 5, offset: Optional[int] = 0) -> str:
-        """Returns the search results for the given term from the oai-monarch-wrapper."""
+        """Returns the search results for the given term"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/search?term={term}&category={category}&limit={limit}&offset={offset}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
+    search_monarch.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'term': {'type': 'string', 'description': 'The term to search for.'},
+                'category': {'type': 'string', 'description': 'The category to search in.', 'enum': ['biolink:Disease', 'biolink:PhenotypicQuality', 'biolink:Gene'], 'default': 'biolink:Disease'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results.', 'default': 0}
+            }
+        },
+        "name": "search_monarch",
+        "description": "Returns the search results for the given term",
+        "required": ["term"]
+    }
 
 
-    def get_disease_gene_associations(self, disease_id: str, limit: Optional[int], offset: Optional[int]) -> str:
-        """Returns the genes associated with the given disease from the oai-monarch-wrapper."""
+    def get_disease_gene_associations(self, disease_id: str, limit: int = 10, offset: int = 1) -> str:
+        """Returns the genes associated with the given disease"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/disease-genes?disease_id={disease_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
-
         return json.dumps(response_json)
-
+    get_disease_gene_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'disease_id': {'type': 'string', 'description': 'The disease ID to get the gene associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }
+        },
+        "name": "get_disease_gene_associations",
+        "description": "Returns the genes associated with the given disease",
+        "required": ["disease_id"]
+    }
 
     def get_disease_phenotype_associations(self, disease_id: str, limit: Optional[int] = 10, offset: Optional[int] = 0) -> str:
-        """Returns the phenotypes associated with the given disease from the oai-monarch-wrapper."""
+        """Returns the phenotypes associated with the given disease"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/disease-phenotypes?disease_id={disease_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
-    
+    get_disease_phenotype_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'disease_id': {'type': 'string', 'description': 'The disease ID to get the phenotype associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }
+        },
+        "name": "get_disease_phenotype_associations",
+        "description": "Returns the phenotypes associated with the given disease",
+        "required": ["disease_id"]
+    }
+
+   
 
     def get_phenotype_gene_associations(self, phenotype_id: str, limit: Optional[int] = 10, offset: Optional[int] = 0) -> str:
-        """Returns the genes associated with the given phenotype from the oai-monarch-wrapper."""
+        """Returns the genes associated with the given phenotype"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/phenotype-genes?phenotype_id={phenotype_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
+    get_phenotype_gene_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'phenotype_id': {'type': 'string', 'description': 'The phenotype ID to get the gene associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }
+        },
+        "name": "get_phenotype_gene_associations",
+        "description": "Returns the genes associated with the given phenotype"
+    }
+
     
     def get_phenotype_disease_associations(self, phenotype_id: str, limit: Optional[int] = 10, offset: Optional[int] = 0) -> str:
-        """Returns the diseases associated with the given phenotype from the oai-monarch-wrapper."""
+        """Returns the diseases associated with the given phenotype"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/phenotype-diseases?phenotype_id={phenotype_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
+    get_phenotype_disease_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'phenotype_id': {'type': 'string', 'description': 'The phenotype ID to get the disease associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }
+        },
+        "name": "get_phenotype_disease_associations",
+        "description": "Returns the diseases associated with the given phenotype"
+    }
     
     def get_gene_disease_associations(self, gene_id: str, limit: Optional[int] = 10, offset: Optional[int] = 0) -> str:
-        """Returns the diseases associated with the given gene from the oai-monarch-wrapper."""
+        """Returns the diseases associated with the given gene"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/gene-diseases?gene_id={gene_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
+    get_gene_disease_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'gene_id': {'type': 'string', 'description': 'The gene ID to get the disease associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }   
+        },
+        "name": "get_gene_disease_associations",
+        "description": "Returns the diseases associated with the given gene"
+    }
+
     
     def get_gene_phenotype_associations(self, gene_id: str, limit: Optional[int] = 10, offset: Optional[int] = 0) -> str:
-        """Returns the phenotypes associated with the given gene from the oai-monarch-wrapper."""
+        """Returns the phenotypes associated with the given gene"""
 
         url = f"{MONARCH_WRAPPER_BASE_URL}/gene-phenotypes?gene_id={gene_id}&limit={limit}&offset={offset + 1}"
         response_json = requests.get(url).json()
 
         return json.dumps(response_json)
+    get_gene_phenotype_associations.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'gene_id': {'type': 'string', 'description': 'The gene ID to get the phenotype associations for.'},
+                'limit': {'type': 'number', 'description': 'The maximum number of results to return.', 'default': 5},
+                'offset': {'type': 'number', 'description': 'The offset to start returning results', 'default': 0}
+            }
+        },
+        "name": "get_gene_phenotype_associations",
+        "description": "Returns the phenotypes associated with the given gene"
+    }

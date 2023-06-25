@@ -16,6 +16,8 @@ httpx = "^0.24.1"
 openai = "^0.27.7"
 asteval = "^0.9.29"
 python-dotenv = "^1.0.0"
+rich = "^13.4.2"
+colorama = "^0.4.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = {version = ">=7.1.2", optional = true}
