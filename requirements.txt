@@ -375,6 +375,9 @@ packaging==23.1 ; python_version >= "3.9" and python_version < "4.0" \
 pluggy==1.0.0 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159 \
     --hash=sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3
+prompt-toolkit==3.0.38 ; python_version >= "3.9" and python_version < "4.0" \
+    --hash=sha256:23ac5d50538a9a38c8bde05fecb47d0b403ecd0662857a86f886f798563d5b9b \
+    --hash=sha256:45ea77a2f7c60418850331366c81cf6b5b9cf4c7fd34616f733c5427e6abbb1f
 pydantic==1.10.8 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:052d8654cb65174d6f9490cc9b9a200083a82cf5c3c5d3985db765757eb3b375 \
     --hash=sha256:0c6fafa0965b539d7aab0a673a046466d23b86e4b0e8019d25fd53f4df62c277 \
@@ -445,6 +448,9 @@ typing-extensions==4.6.3 ; python_version >= "3.9" and python_version < "4.0" \
 urllib3==2.0.2 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:61717a1095d7e155cdb737ac7bb2f4324a858a1e2e6466f6d03ff630ca68d3cc \
     --hash=sha256:d055c2f9d38dc53c808f6fdc8eab7360b6fdbbde02340ed25cfbcd817c62469e
+wcwidth==0.2.6 ; python_version >= "3.9" and python_version < "4.0" \
+    --hash=sha256:795b138f6875577cd91bba52baf9e445cd5118fd32723b460e30a0af30ea230e \
+    --hash=sha256:a5220780a404dbe3353789870978e472cfe477761f06ee55077256e509b156d0
 yarl==1.9.2 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:04ab9d4b9f587c06d801c2abfe9317b77cdf996c65a90d5e84ecc45010823571 \
     --hash=sha256:066c163aec9d3d073dc9ffe5dd3ad05069bcb03fcaab8d221290ba99f9f69ee3 \

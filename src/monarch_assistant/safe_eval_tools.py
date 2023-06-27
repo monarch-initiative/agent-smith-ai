@@ -6,6 +6,7 @@ from asteval import Interpreter
 from collections import Counter
 from math import log2
 from typing import Optional, Literal
+import readline
 
 
 MONARCH_WRAPPER_BASE_URL = "http://localhost:3434"
@@ -83,6 +84,24 @@ class SafeEval:
         },
         "name": "time",
         "description": "Returns the current time."
+    }
+
+    def set_show_function_calls(self, show: bool) -> bool:
+        os.environ["SHOW_FUNCTION_CALLS"] = str(show)
+        return show
+    set_show_function_calls.schema = {
+        "parameters": {
+            "type": "object",
+            "properties": {
+                'show': {
+                    'type': 'boolean', 
+                    'description': 'Whether to show function calls in the output.'
+                }
+            }
+        },
+        "name": "set_show_function_calls",
+        "description": "Sets whether to show function calls in the output.",
+        "required": ["show"]
     }
 
     def entropy(self, lst):
