@@ -2,7 +2,7 @@
 
 This repo attempts to replicate OpenAI's Plugin ecosystem using their [function-calling models](https://openai.com/blog/function-calling-and-other-api-updates). 
 
-It utilizes the same API wrapper, https://github.com/monarch-initiative/oai-monarch-plugin, and so requires that to be running (on `localhost:3434` by default, or 
+It utilizes the same API wrapper, https://github.com/monarch-initiative/oai-monarch-plugin, and so requires it to be running (on `localhost:3434` by default, or 
 as specified via the `MONARCH_WRAPPER_BASE_URL` environment variable). It also requires an `OPENAI_API_KEY`; both of these can be added to a `.env` file in the base
 of this repo such as:
 
@@ -23,10 +23,10 @@ Current limitations:
 * Code is still rough, and major architectural changes are on the table. 
 * Providing an API interface to this agent (for use in a web UI, for example) is a work in progress, currently the command-line interface is more robust.
 * Not all features of https://github.com/monarch-initiative/oai-monarch-plugin are supported
-* The default model is `gpt-3.5-turbo-16k-0613` which provides a 16k context window, but no context window management or conversation summarisation/compression is implemented, so eventually it will fail (especially when calling functions which use a lot of tokens)
+* The default model is `gpt-3.5-turbo-16k-0613` which provides a 16k context window, but no context window management or conversation summarisation/compression is implemented yet, so eventually it will fail (especially when calling functions which use a lot of tokens)
 
 
-### How to
+## Setup and run
 
 First, get https://github.com/monarch-initiative/oai-monarch-plugin running, by default on `http://localhost:3434`.
 
@@ -34,7 +34,7 @@ Next, create a `.env` file in the root of this repo with entries for `OPENAI_API
 
 Run `make chat`, which will install dependencies and run the command-line UI. 
 
-Example chat (link formatting not shown, but available in terminal):
+Example chat (fun colors and link formatting not showing here, but available in terminal):
 
 ```
 ──────────────────────────────────────── Monarch Assistant ─────────────────────────────────────────
@@ -357,3 +357,8 @@ User: exit
 │ great day!                                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
+
+
+## Acknowledgements
+
+This [cookiecutter](https://cookiecutter.readthedocs.io/en/stable/README.html) project was developed from the [monarch-project-template](https://github.com/monarch-initiative/monarch-project-template) template and will be kept up-to-date using [cruft](https://cruft.github.io/cruft/).
