@@ -6,7 +6,9 @@ from asteval import Interpreter
 from collections import Counter
 from math import log2
 from typing import Optional, Literal
-import readline
+
+import dotenv
+dotenv.load_dotenv()
 
 
 MONARCH_WRAPPER_BASE_URL = "http://localhost:3434"
