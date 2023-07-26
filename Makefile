@@ -8,11 +8,11 @@ all: install export-requirements start
 
 dev: install start-dev
 
-start:
-	poetry run gunicorn src.monarch_assistant.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080
+prod-server:
+	poetry run gunicorn src.monarch_assistant.api:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080
 
-start-dev:
-	poetry run uvicorn src.monarch_assistant.main:app --host 0.0.0.0 --port 3535 --reload
+dev-server:
+	poetry run uvicorn src.monarch_assistant.api:app --host 0.0.0.0 --port 3535 --reload
 
 test:
     # --capture=no to see stdout in logs for successful tests
@@ -25,7 +25,7 @@ install:
 	poetry install
 
 run-chat:
-	poetry run python3 src/monarch_assistant/cli.py run
+	poetry run python3 -m src.monarch_assistant.cli make_chat
 
 chat: install export-requirements run-chat
 

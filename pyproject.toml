@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "monarch-assistant"
+name = "monarch_assistant"
 version = "0.0.0"
 description = "monarch-assistant"
 authors = ["Shawn T. O'Neil <shawn@tislab.org>"]
