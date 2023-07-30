@@ -380,6 +380,18 @@ files = [
 ]
 
 [[package]]
+name = "docstring-parser"
+version = "0.15"
+description = "Parse Python docstrings in reST, Google and Numpydoc format"
+category = "main"
+optional = false
+python-versions = ">=3.6,<4.0"
+files = [
+    {file = "docstring_parser-0.15-py3-none-any.whl", hash = "sha256:d1679b86250d269d06a99670924d6bce45adc00b08069dae8c47d98e89b667a9"},
+    {file = "docstring_parser-0.15.tar.gz", hash = "sha256:48ddc093e8b1865899956fcc03b03e66bb7240c310fac5af81814580c55bf682"},
+]
+
+[[package]]
 name = "docutils"
 version = "0.18.1"
 description = "Docutils -- Python Documentation Utilities"
@@ -1668,4 +1680,4 @@ tests = ["pytest"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "6324a54567ee657ca1e67843bc0585d054baa92c5398316b2642867f64cd2df2"
+content-hash = "5dbf4671e83aa5bd5186f3615102552a379372da17670789c0dc3f8d761bb518"

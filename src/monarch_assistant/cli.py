@@ -3,9 +3,8 @@ import click
 import logging
 
 from monarch_assistant import __version__
-from monarch_assistant.tool_agent import start_new_chat_generic, continue_chat
-from monarch_assistant.models import Chat
-from models import *
+from monarch_assistant.tool_agent import UtilityAgent
+from monarch_assistant.models import *
 import pprint
 import json
 import os
@@ -100,6 +99,30 @@ def log_message(message: Message):
     console = Console(width = OUTPUT_WIDTH)
 
 
+
+class MonarchAgent(UtilityAgent):
+    def __init__(self, name: str = "Assistant", system_message: str = "You are a helpful assistant"):
+        super().__init__(name, system_message)
+
+        self.register_api("monarch", "https://oai-monarch-plugin.monarchinitiative.org/openapi.json", "https://oai-monarch-plugin.monarchinitiative.org")
+        self.register_callable_method("example_queries")
+
+
+    def example_queries(self, num_examples: int) -> List[str]:
+        """
+        Generate example queries for the Monarch API.
+
+        Args:
+            num_examples: The number of example queries to generate.
+
+        Returns: 
+            A list of example queries.
+        """
+        util_agent = UtilityAgent("Utility", "Answer the given question as instructed, returning a JSON string as the result.")
+        result = list(util_agent.new_chat(f"Please provide {num_examples} example questions one could ask about the Monarch Initiative Knowledge graph. Limit examples to genes, diseases, and phenotypes. Potential examples include 'What genes are associated with Cystic Fibrosis?' and 'What are diseases associated with short stature?'."))[0].content
+        return result
+    
+
 @main.command()
 def run():
     """Run the monarch-assistant's demo command."""
@@ -112,7 +135,8 @@ def run():
 * For a bit of fun, try asking me to describe my plan. For example, "What are the symptoms of Cystic Fibrosis? Describe your plan before you execute it."
 """))
 
-    system_message: Message = Message(role="system", content="""
+    agent = MonarchAgent("Monarch", 
+"""
 You are the Monarch Assistant, an AI-powered chatbot that can answer questions about data from the Monarch Initiative knowledge graph. 
 You can search for entities such as genes, diseases, and phenotypes by name to get the associated ontology identifier. 
 You can retrieve associations between entities via their identifiers. 
@@ -124,23 +148,14 @@ IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all re
 
     user_input = session.prompt([('class:prompt', 'User: ')])
 
-    new_message = Message(role="user", content=user_input)
-
-    # Create a generator for the chat
-    new_chat_generator = start_new_chat_generic(system_message, new_message, model = "gpt-3.5-turbo-16k-0613")
-    for chat in new_chat_generator: # loops over potential function call sequences
-        last_message = chat.messages[-1]
-        log_message(last_message)
+    for message in agent.new_chat(user_input):
+        log_message(message)
 
     while user_input != "exit":
         user_input = session.prompt([('class:prompt', 'User: ')])
 
-        new_message = Message(role="user", content=user_input)
-        continue_chat_generator = continue_chat(chat, new_message, model = "gpt-3.5-turbo-16k-0613")
-
-        for chat in continue_chat_generator:
-            last_message = chat.messages[-1]
-            log_message(last_message)
+        for message in agent.continue_chat(user_input):
+            log_message(message)
 
 
 
