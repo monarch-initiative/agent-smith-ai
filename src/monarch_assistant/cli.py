@@ -137,7 +137,7 @@ IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all re
             A list of example queries.
         """
         util_agent = UtilityAgent("SubAgent")
-        yield from util_agent.new_chat(f"Please provide {num_examples} example questions one could ask about the Monarch Initiative Knowledge graph. And report the time.", author = self.name + " (in function call)", yield_prompt_message = True):
+        yield from util_agent.new_chat(f"Please provide {num_examples} example questions one could ask about the Monarch Initiative Knowledge graph. And report the time.", author = self.name + " (in function call)", yield_prompt_message = True)
 
 
 @main.command()
