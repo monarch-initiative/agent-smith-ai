@@ -60,10 +60,11 @@ def generate_schema(fn):
 class UtilityAgent:
     def __init__(self, name: str = "Assistant", system_message: str = "You are a helpful assistant"):
         self.name = name
-        self.history = Chat(messages = [Message(role = "system", content = system_message)])
+        self.system_message = system_message
+        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System")])
     
         self.api_set = APIWrapperSet([])
-        self.callable_methods = ["time"]
+        self.callable_methods = ["time", "print_history"]
 
     def register_api(self, name: str, spec_url: str, base_url: str):
         self.api_set.add_api(name, spec_url, base_url)
@@ -75,12 +76,25 @@ class UtilityAgent:
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         return [generate_schema(m[1]) for m in methods if m[0] in self.callable_methods]
 
+
     def call_method(self, method_name: str, params: dict):
         method = getattr(self, method_name, None)
         if method is not None and callable(method):
-            return method(**params)
+            result = method(**params)
+            if inspect.isgenerator(result):
+                yield from result
+            else:
+                yield result
         else:
             raise ValueError(f"No such method: {method_name}")
+
+
+    def print_history(self):
+        """Prints the full chat history to the console.
+        
+        Returns: None
+        """
+        pp.pprint(self.history.dict())
 
     def time(self):
         """Get the current date and time.
@@ -93,47 +107,65 @@ class UtilityAgent:
 
 
 
-    def new_chat(self, user_message: str, model: str = "gpt-3.5-turbo-0613") -> Chat:
+    def new_chat(self, user_message: str, yield_system_message = False, yield_prompt_message = False, author = "User", model: str = "gpt-3.5-turbo-0613") -> Chat:
         """Starts a new chat with the given system message and user message.
         If the response contains <eval> tags, a response back to the model with the evaluated results will be added to the conversation. See the replace_eval_tags() function for more details.
         Example usage: start_new_chat("You are a helpful assistant.", "Hi!")"""
+        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System")])
 
-        user_message = Message(role = "user", content = user_message)
+        if yield_system_message:
+            yield self.history.messages[0]
+
+        user_message = Message(role = "user", content = user_message, author = author)
+
+        if yield_prompt_message:
+            yield user_message
+
         self.history.messages.append(user_message)
 
-        response_raw = openai.ChatCompletion.create(
-                  model=model,
-                  temperature = 0,
-                  messages = self.deserialize_chat(self.history),
-                  functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
-                  function_call = "auto")
-        
-        for message in self.process_model_response(response_raw, model = model):
-            self.history.messages.append(message)
-            ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
-            yield message
+        try:
+            response_raw = openai.ChatCompletion.create(
+                      model=model,
+                      temperature = 0,
+                      messages = self.deserialize_chat(self.history),
+                      functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
+                      function_call = "auto")
+            
+            for message in self.process_model_response(response_raw, model = model):
+                self.history.messages.append(message)
+                ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
+                yield message
+        except Exception as e:
+            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = self.name)
 
 
 
-    def continue_chat(self, new_user_message: str, model: str = "gpt-3.5-turbo-0613") -> Chat:
+    def continue_chat(self, new_user_message: str, yield_prompt_message = False, author = "User", model: str = "gpt-3.5-turbo-0613") -> Chat:
         """Continues a chat with the given messages and new user message.
         If the response contains <eval> tags, a response back to the model with the evaluated results will be added to the conversation. See the replace_eval_tags() function for more details.
         Example usage: continue_chat([{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Hi!"}, {"role": "assistant", "content": "Hello, how can I help today?"}], "What are pillows?")"""
 
-        new_user_message = Message(role = "user", content = new_user_message)
+        new_user_message = Message(role = "user", content = new_user_message, author = author)
+
+        if yield_prompt_message:
+            yield new_user_message
+
         self.history.messages.append(new_user_message)
 
-        response_raw = openai.ChatCompletion.create(
-                  model=model,
-                  temperature = 0,
-                  messages = self.deserialize_chat(self.history),
-                  functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
-                  function_call = "auto")
+        try:
+            response_raw = openai.ChatCompletion.create(
+                      model=model,
+                      temperature = 0,
+                      messages = self.deserialize_chat(self.history),
+                      functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
+                      function_call = "auto")
 
-        for message in self.process_model_response(response_raw, model = model):
-            self.history.messages.append(message)
-            ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
-            yield message
+            for message in self.process_model_response(response_raw, model = model):
+                self.history.messages.append(message)
+                ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
+                yield message
+        except Exception as e:
+            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = self.name)
 
 
     def process_model_response(self, response_raw, model = "gpt-3.5-turbo-0613") -> Chat:
@@ -144,6 +176,7 @@ class UtilityAgent:
             new_message = Message(role = message["role"], 
                                   content = message["content"], 
                                   finish_reason = finish_reason, 
+                                  author = self.name,
                                   is_function_call = False)
             yield new_message
             return None
@@ -155,6 +188,7 @@ class UtilityAgent:
                                   content = message["content"],
                                   is_function_call = True,
                                   name = func_name, 
+                                  author = self.name + " (function call)",
                                   arguments = func_arguments)
             yield new_message
 
@@ -168,29 +202,52 @@ class UtilityAgent:
                 new_message = Message(role = "function", 
                                       content = func_result, 
                                       name = func_name, 
+                                      author = self.name + " (function response)",
                                       is_function_call = False)
+                yield new_message
+                
             elif func_name in self.callable_methods:
                 try:
+                    # call_method is a generator, even if the method it's calling is not
+                    # but if the method being called is a generator, it yields from the called generator
+                    # so regardless, we are looping over results, but each to see if hte result is already a message (as 
+                    # will happen in the case of a method that calls a sub-agent)
                     func_result = self.call_method(func_name, func_arguments)
+                    for potential_message in func_result:
+                        if isinstance(potential_message, Message):
+                            yield potential_message
+                        else:
+                            new_message = Message(role = "function", 
+                                                  content = json.dumps(potential_message), 
+                                                  name = func_name, 
+                                                  author = self.name + " (function response)",
+                                                  is_function_call = False)
+                            yield new_message
+
+
                 except ValueError as e:
-                    func_result = f"Sorry, there seems to have been an issue with the method call. {str(e)}"
+                    yield Message(role = "function",
+                                  content = f"Error in attempted function call: {str(e)}",
+                                  name = func_name,
+                                  author = self.name + " (function response)",
+                                  is_function_call = False)
 
-                new_message = Message(role = "function",
-                                        content = func_result,
-                                        name = func_name,
-                                        is_function_call = False)
+        # if we've gotten here, there was a function call and a result
+        # now we send the funciton call result back to the model for it to work with
+        # the result might be *another* function call, so it is processed recursively
+        try:
+            reponse_raw = openai.ChatCompletion.create(
+                              model=model,
+                              temperature = 0,
+                              messages = self.deserialize_chat(self.history),
+                              functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
+                              function_call = "auto")
+            
+            for message in self.process_model_response(reponse_raw, model = model):
+                yield message
 
-            yield new_message            
-
-        reponse_raw = openai.ChatCompletion.create(
-                          model=model,
-                          temperature = 0,
-                          messages = self.deserialize_chat(self.history),
-                          functions = self.api_set.get_function_schemas() + self.get_method_schemas(),
-                          function_call = "auto")
-        
-        for message in self.process_model_response(reponse_raw, model = model):
-            yield message
+        except Exception as e:
+            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = self.name)
 
 
     def deserialize_message(self, message: Message) -> Dict[str, Any]:

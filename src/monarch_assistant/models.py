@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class Message(BaseModel):
     """A message in a chat conversation, in internal representation, with RawMessages being accompanied by lists of thoughts."""
     role: str
+    author: str = None
     is_function_call: bool = False
     content: Optional[str] = None
     name: Optional[str] = None # for function call results

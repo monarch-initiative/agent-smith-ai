@@ -2,6 +2,8 @@
 import click
 import logging
 
+from typing import Generator, List, Optional
+
 from monarch_assistant import __version__
 from monarch_assistant.tool_agent import UtilityAgent
 from monarch_assistant.models import *
@@ -32,7 +34,7 @@ session = PromptSession(history=FileHistory(histfile), style=style)
 
 OUTPUT_WIDTH = 100
 
-console = Console(width = OUTPUT_WIDTH)
+#console = Console(width = OUTPUT_WIDTH)
 pp = pprint.PrettyPrinter(indent=4)
 
 os.environ["SHOW_FUNCTION_CALLS"] = 'True'
@@ -83,32 +85,48 @@ def render_panel(content: str, title: str, style = "default", title_align: str =
     console.print(Panel(Markdown(f"{content}"), title = title, title_align=title_align))
 
 
-def log_message(message: Message):
-    global console
+
+def log_message(message: Message, output_width = 100):
+#    global console
     """Logs a message to the console."""
+
+
+
     if message.role == "user":
-        render_panel(message.content, "User", style = "cyan")
+        render_panel(message.content, message.author, style = "cyan")
     elif message.role == "assistant":
         if(message.content):
-            render_panel(message.content, "Assistant", style = "blue")
+            render_panel(message.content, message.author, style = "blue")
         if(message.is_function_call and os.environ["SHOW_FUNCTION_CALLS"] == 'True'):
-            render_panel(f"{message.name}(params = {message.arguments})", "Function Call", style = "default")
+            render_panel(f"```\n{message.name}(params = {message.arguments})\n```", message.author, style = "default")
     elif message.role == "function" and os.environ["SHOW_FUNCTION_CALLS"] == 'True':
-            render_panel(message.content, "Function Response", style = "default", newline = False)
+            render_panel(message.content, message.author, style = "default", newline = False)
 
-    console = Console(width = OUTPUT_WIDTH)
+#    console = Console(width = OUTPUT_WIDTH)
 
 
 
 class MonarchAgent(UtilityAgent):
-    def __init__(self, name: str = "Assistant", system_message: str = "You are a helpful assistant"):
-        super().__init__(name, system_message)
+    def __init__(self, name: str):
+
+        self.name = name
+        self.system_message = """
+You are a Monarch Assistant named {self.name}, an AI-powered chatbot that can answer questions about data from the Monarch Initiative knowledge graph. 
+You can search for entities such as genes, diseases, and phenotypes by name to get the associated ontology identifier. 
+You can retrieve associations between entities via their identifiers. 
+Users may use synonyms such as 'illness' or 'symptom'. Do not assume the user is familiar with biomedical terminology. 
+Always add additional information such as lay descriptions of phenotypes. 
+If the user changes the show function call setting, do not make any further function calls immediately.
+IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
+"""
+
+        super().__init__(name, self.system_message)
 
         self.register_api("monarch", "https://oai-monarch-plugin.monarchinitiative.org/openapi.json", "https://oai-monarch-plugin.monarchinitiative.org")
         self.register_callable_method("example_queries")
 
 
-    def example_queries(self, num_examples: int) -> List[str]:
+    def example_queries(self, num_examples: int):
         """
         Generate example queries for the Monarch API.
 
@@ -118,33 +136,21 @@ class MonarchAgent(UtilityAgent):
         Returns: 
             A list of example queries.
         """
-        util_agent = UtilityAgent("Utility", "Answer the given question as instructed, returning a JSON string as the result.")
-        result = list(util_agent.new_chat(f"Please provide {num_examples} example questions one could ask about the Monarch Initiative Knowledge graph. Limit examples to genes, diseases, and phenotypes. Potential examples include 'What genes are associated with Cystic Fibrosis?' and 'What are diseases associated with short stature?'."))[0].content
-        return result
-    
+        util_agent = UtilityAgent("SubAgent")
+        yield from util_agent.new_chat(f"Please provide {num_examples} example questions one could ask about the Monarch Initiative Knowledge graph. And report the time.", author = self.name + " (in function call)", yield_prompt_message = True):
+
 
 @main.command()
 def run():
     """Run the monarch-assistant's demo command."""
 
-    console.rule("Monarch Assistant")
-    log_message(Message(role="assistant", content="""Hello! I am the Monarch Assistant, an AI-powered chatbot that can answer questions about genes, diseases, and phenotypes. I am a work in progress, and you shouldknow the following:
-* I currently rely on https://github.com/monarch-initiative/oai-monarch-plugin, but am not at feature parity.
+    log_message(Message(role="assistant", content="""Hello! I'm the Monarch Assistant, an AI-powered chatbot that can answer questions about genes, diseases, and phenotypes, based on information hosted at https://monarchinitiative.org.
 * You can exit by saying 'exit', and you can request that I turn on or off function call responses by saying 'show function calls' or 'hide function calls' at any time. They are shown by default.
 * I do not currently implement context-window management, so after a while your conversation will produce an error.
 * For a bit of fun, try asking me to describe my plan. For example, "What are the symptoms of Cystic Fibrosis? Describe your plan before you execute it."
-"""))
+""", author="Monarch Assistant"))
 
-    agent = MonarchAgent("Monarch", 
-"""
-You are the Monarch Assistant, an AI-powered chatbot that can answer questions about data from the Monarch Initiative knowledge graph. 
-You can search for entities such as genes, diseases, and phenotypes by name to get the associated ontology identifier. 
-You can retrieve associations between entities via their identifiers. 
-Users may use synonyms such as 'illness' or 'symptom'. Do not assume the user is familiar with biomedical terminology. 
-Always add additional information such as lay descriptions of phenotypes. 
-If the user changes the show function call setting, do not make any further function calls immediately.
-IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
-""")
+    agent = MonarchAgent("Monarch Assistant")
 
     user_input = session.prompt([('class:prompt', 'User: ')])
 
