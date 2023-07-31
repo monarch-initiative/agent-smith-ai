@@ -18,7 +18,6 @@ class Chat(BaseModel):
 
 
 
-
 # for function JSON schema sent to the model
 
 class ParameterProperty(BaseModel):

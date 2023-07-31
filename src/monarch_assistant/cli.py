@@ -1,23 +1,19 @@
 """Command line interface for monarch-assistant."""
 import click
 import logging
-
-from typing import Generator, List, Optional
+import pprint
+import json
+import os
 
 from monarch_assistant import __version__
 from monarch_assistant.tool_agent import UtilityAgent
 from monarch_assistant.models import *
-import pprint
-import json
-import os
-import sys
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.padding import Padding
 from rich.text import Text
 from rich.panel import Panel
-from colorama import Fore, Style
+from colorama import Style
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory

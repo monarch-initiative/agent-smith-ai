@@ -1,8 +1,8 @@
 import requests
 import json
-import pprint
 
-pp = pprint.PrettyPrinter(indent=4)
+# import pprint
+# pp = pprint.PrettyPrinter(indent=4)
 
 class APIWrapper:
     def __init__(self, prefix, spec_url, base_url):

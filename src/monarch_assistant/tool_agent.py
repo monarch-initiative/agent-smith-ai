@@ -3,9 +3,8 @@ from datetime import datetime
 import inspect
 import os
 import pprint
-import re
 import json
-from typing import Any, Dict, List, Optional, Union, get_args, get_origin, Callable
+from typing import Any, Dict, List, get_args, get_origin
 
 # Third party imports
 from docstring_parser import parse
@@ -13,13 +12,13 @@ import openai
 import dotenv
 
 # Local application imports
-from monarch_assistant.openapi_wrapper import APIWrapper, APIWrapperSet 
+from monarch_assistant.openapi_wrapper import APIWrapperSet 
 from monarch_assistant.models import *
-
 
 
 dotenv.load_dotenv()
 openai.api_key = os.environ["OPENAI_API_KEY"]
+
 pp = pprint.PrettyPrinter(indent=4, width = 80, sort_dicts = False, compact = False)
 
 
