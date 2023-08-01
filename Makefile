@@ -16,13 +16,13 @@ export-requirements:
 install:
 	poetry install
 
-chat: 
-	poetry run python3 -m src.monarch_assistant.cli run
+cli-monarch: 
+	poetry run python3 examples/monarch_cli.py
 
 help:
 	@echo ""
 	@echo "make all -- installs requirements, exports requirements.txt, runs chat cli"
 	@echo "make test -- runs tests"
-	@echo "make chat -- runs chat cli"
+	@echo "make cli-monarch -- runs the example monarch cli"
 	@echo "make help -- show this help"
 	@echo ""

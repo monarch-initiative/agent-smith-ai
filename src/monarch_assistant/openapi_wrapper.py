@@ -1,15 +1,17 @@
 import requests
 import json
 
-# import pprint
-# pp = pprint.PrettyPrinter(indent=4)
 
 class APIWrapper:
-    def __init__(self, prefix, spec_url, base_url):
+    def __init__(self, prefix, spec_url, base_url, callable_endpoints = []):
         self.prefix = prefix
         self.spec_url = spec_url
         self.base_url = base_url
         self.endpoints = self.parse_openapi_spec()
+
+        if len(callable_endpoints) > 0:
+            callable_endpoints = [prefix + "-" + ep for ep in callable_endpoints]
+            self.endpoints = [ep for ep in self.endpoints if ep['name'] in callable_endpoints]
 
     def parse_openapi_spec(self):
         try:
@@ -27,16 +29,13 @@ class APIWrapper:
         for path, path_item in spec['paths'].items():
             for method, operation in path_item.items():
                 if method in ['get', 'post', 'put', 'delete', 'options', 'head', 'patch', 'trace']:
-                    if 'description' in operation:
+                    if 'description' in operation and 'operationId' in operation:
                         endpoint = {
                             'name': self.prefix + '-' + operation.get('operationId'),
                             'description': operation.get('description'),
                             'parameters': {
                                 'type': 'object',
-                                'properties': {
-                                    # param['name']: param['schema']
-                                    # for param in operation.get('parameters', [])
-                                },
+                                'properties': {},
                                 'required': [param['name'] for param in operation.get('parameters', []) if param.get('required')],
                             },
                             'method': method,
@@ -121,8 +120,8 @@ class APIWrapperSet:
     def __init__(self, api_wrappers):
         self.api_wrappers = api_wrappers
 
-    def add_api(self, name: str, spec_url: str, base_url: str):
-        self.api_wrappers.append(APIWrapper(name, spec_url, base_url))
+    def add_api(self, name: str, spec_url: str, base_url: str, callable_endpoints = []):
+        self.api_wrappers.append(APIWrapper(name, spec_url, base_url, callable_endpoints))
 
     def get_function_schemas(self):
         return [schema for wrapper in self.api_wrappers for schema in wrapper.get_function_schemas()]
