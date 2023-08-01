@@ -2,27 +2,8 @@
 from monarch_assistant.utility_agent import UtilityAgent
 from monarch_assistant.models import *
 
-
-
-# def test_utility_agent():
-#     agent = UtilityAgent()
-
-#     assert agent.name is not None
-#     assert agent.api_set is not None
-#     assert agent.history is not None
-
-#     for message in agent.new_chat("Hey!"):
-#         print("\n\n\nMESSAGE: ", message.dict())
-#         assert message.role is not None
-#         assert message.content is not None
-
-#     for message in agent.continue_chat("What's your name?"):
-#         print("\n\n\nMESSAGE: ", message.dict())
-#         assert message.role is not None
-#         assert message.content is not None
-
-
-
+import dotenv
+dotenv.load_dotenv()
 
 
 class ExampleAgent(UtilityAgent):
@@ -76,39 +57,6 @@ def test_example_agent():
         assert message.role is not None
         assert message.content is not None
 
-    # for message in agent.continue_chat("What's your name?"):
-    #     print("\n\n\nMESSAGE: ", message.dict())
-    #     assert message.role is not None
-    #     assert message.content is not None
-
-    # for message in agent.continue_chat("Sing a song!"):
-    #     print("\n\n\nMESSAGE: ", message.dict())
-    #     assert message.role is not None
-
     for message in agent.continue_chat("Can you run me a 3 second timer?"):
         print("\n\n\nMESSAGE: ", message)
         assert message.role is not None        
-
-
-# def test_api_tool_agent_initialize():
-#     agent = MonarchAgent("Monarch")
-    
-#     assert agent.name == "Monarch"
-#     assert agent.system_message == "You are a helpful assistant who can connect to the Monarch API."
-#     assert agent.api_set is not None
-#     assert agent.history is not None
-
-
-# def test_api_tool_agent_new_chat():
-#     agent = MonarchAgent("Monarch")
-    
-#     for message in agent.new_chat("Hi!"):
-#         print("\n\n\n", message)
-#         assert message.role is not None
-#         assert message.content is not None
-
-     
-#     for message in agent.continue_chat("What genes are correlated with Cystic Fibrosis?"):
-#         print("\n\n\n", message)
-#         assert message.role is not None
-#         assert message.content is not None

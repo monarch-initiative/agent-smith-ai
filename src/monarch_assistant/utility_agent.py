@@ -3,7 +3,7 @@ from datetime import datetime
 import inspect
 import os
 import json
-from typing import Any, Dict, List, get_args, get_origin
+from typing import Any, Dict, List, Union, Literal, get_args, get_origin
 
 # Third party imports
 from docstring_parser import parse
@@ -97,7 +97,7 @@ class UtilityAgent:
             yield user_message
 
         self.history.messages.append(user_message)
-
+        
         try:
             response_raw = openai.ChatCompletion.create(
                       model=self.model,
@@ -105,13 +105,13 @@ class UtilityAgent:
                       messages = self._reserialize_chat(self.history),
                       functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
                       function_call = "auto")
-            
+
             for message in self._process_model_response(response_raw, intended_recipient = author):
                 self.history.messages.append(message)
                 ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
                 yield message
         except Exception as e:
-            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = "System", intended_recipient = author)
+            yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
 
 
 
@@ -140,7 +140,7 @@ class UtilityAgent:
                 ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
                 yield message
         except Exception as e:
-            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = "System", intended_recipient = author)
+            yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
 
 
     def _process_model_response(self, response_raw, intended_recipient) -> Chat:
@@ -220,7 +220,7 @@ class UtilityAgent:
 
                 except ValueError as e:
                     yield Message(role = "function",
-                                  content = f"Error in attempted function call: {str(e)}",
+                                  content = f"Error in attempted method call: {str(e)}",
                                   func_name = func_name,
                                   author = f"{self.name} ({func_name} function)",
                                   intended_recipient = self.name,
@@ -248,7 +248,7 @@ class UtilityAgent:
                               functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
                               function_call = "auto")
         except Exception as e:
-            yield Message(role = "assistant", content = f"Error in attempted function call: {str(e)}", author = "System", intended_recipient = intended_recipient)
+            yield Message(role = "assistant", content = f"Error in sending function or method call result to model: {str(e)}", author = "System", intended_recipient = intended_recipient)
             # if there was a failure in the summary/further work determination, we shouldn't try to do further work, just exit
             return None
 
@@ -289,10 +289,38 @@ def _python_type_to_json_schema(py_type):
     """Translate Python typing annotation to JSON schema-like types."""
     origin = get_origin(py_type)
     if origin is None:  # means it's a built-in type
-        return {'type': 'number' if py_type is float else 'string'}
+        if py_type in [float, int]:
+            return {'type': 'number'}
+        elif py_type is str:
+            return {'type': 'string'}
+        elif py_type is bool:
+            return {'type': 'boolean'}
+        elif py_type is None:
+            return {'type': 'null'}
+        elif py_type is Any:
+            return {'type': 'object'}
+        else:
+            raise NotImplementedError(f'Unsupported type: {py_type}')
     elif origin is list:
         item_type = get_args(py_type)[0]
         return {'type': 'array', 'items': _python_type_to_json_schema(item_type)}
+    elif origin is dict:
+        key_type, value_type = get_args(py_type)
+        return {'type': 'object', 'properties': {
+            'key': _python_type_to_json_schema(key_type),
+            'value': _python_type_to_json_schema(value_type)
+        }}
+    elif origin is Union:
+        return {'anyOf': [_python_type_to_json_schema(t) for t in get_args(py_type)]}
+    elif origin is Literal:
+        return {'enum': get_args(py_type)}
+    elif origin is tuple:
+        return {'type': 'array', 'items': [_python_type_to_json_schema(t) for t in get_args(py_type)]}
+    elif origin is set:
+        return {'type': 'array', 'items': _python_type_to_json_schema(get_args(py_type)[0]), 'uniqueItems': True}
+    else:
+        raise NotImplementedError(f'Unsupported type: {origin}')
+    
 
 
 def _generate_schema(fn):

@@ -1,6 +1,7 @@
 from monarch_assistant.cli_agent import CLIAgent
 
 import textwrap
+from typing import Any, Dict
 
 # load environment variables from .env file
 import dotenv
@@ -36,9 +37,27 @@ class MonarchAgent(CLIAgent):
                                                 'get_phenotype_disease_associations'])
 
 
+        # the agent can also call local methods, but we have to register them
+        self.register_callable_methods(['compute_entropy'])
 
         # let's also show the function calls and results behind the scenes as they happen (inherited from CLIAgent)
         self.show_function_calls()
+
+    ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
+    ## try asking something like "What is the entropy of a standard tile set in Scrabble?"
+    def compute_entropy(self, items: Dict[Any, int]):
+        """Compute the information entropy of a given set of item counts.
+        
+        Args:
+            items (str): A dictionary of items and their counts.
+            
+        Returns:
+            The information entropy of the item counts.
+        """
+        from math import log2
+        
+        total = sum(items.values())
+        return -sum([count / total * log2(count / total) for count in items.values()])
 
 
 # Create a new agent
