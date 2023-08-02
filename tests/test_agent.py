@@ -1,6 +1,6 @@
 # pytests for tool_agent.py
-from monarch_assistant.utility_agent import UtilityAgent
-from monarch_assistant.models import *
+from agent_smith_ai.utility_agent import UtilityAgent
+from agent_smith_ai.models import *
 
 import dotenv
 dotenv.load_dotenv()

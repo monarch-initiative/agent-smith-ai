@@ -11,8 +11,8 @@ import openai
 import tiktoken
 
 # Local application imports
-from monarch_assistant.openapi_wrapper import APIWrapperSet 
-from monarch_assistant.models import *
+from agent_smith_ai.openapi_wrapper import APIWrapperSet 
+from agent_smith_ai.models import *
 
 
 

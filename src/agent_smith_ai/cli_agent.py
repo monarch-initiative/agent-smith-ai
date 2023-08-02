@@ -1,5 +1,5 @@
-from monarch_assistant.utility_agent import UtilityAgent
-from monarch_assistant.models import *
+from agent_smith_ai.utility_agent import UtilityAgent
+from agent_smith_ai.models import *
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory

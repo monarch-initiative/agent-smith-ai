@@ -1,4 +1,4 @@
-from monarch_assistant.utility_agent import _python_type_to_json_schema
+from agent_smith_ai.utility_agent import _python_type_to_json_schema
 import typing
 
 def test_python_type_to_json_schema_str():

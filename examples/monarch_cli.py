@@ -1,4 +1,4 @@
-from monarch_assistant.cli_agent import CLIAgent
+from agent_smith_ai.cli_agent import CLIAgent
 
 import textwrap
 from typing import Any, Dict

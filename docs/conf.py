@@ -7,7 +7,7 @@ import os
 import re
 import sys
 from datetime import date
-from monarch_assistant import __version__
+from agent_smith_ai import __version__
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 

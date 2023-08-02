@@ -4,7 +4,7 @@
 ##
 
 
-from monarch_assistant.utility_agent import UtilityAgent
+from agent_smith_ai.utility_agent import UtilityAgent
 
 import textwrap
 import os
