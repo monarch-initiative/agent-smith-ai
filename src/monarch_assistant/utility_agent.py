@@ -33,17 +33,18 @@ class UtilityAgent:
         self.api_set = APIWrapperSet([])
         self.callable_methods = []
 
-        self.register_callable_methods(["time", "print_history", "help", "count_history_tokens"])
+        self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached
+        self.register_callable_methods(["time", "help"])
+
+
 
     def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []):
         self.api_set.add_api(name, spec_url, base_url, callable_endpoints)
 
-    def register_callable_method(self, method_name: str):
-        self.callable_methods.append(method_name)
-
     def register_callable_methods(self, method_names: List[str]):
         for method_name in method_names:
             self.callable_methods.append(method_name)
+
 
     def _get_method_schemas(self):
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
@@ -62,13 +63,45 @@ class UtilityAgent:
             raise ValueError(f"No such method: {method_name}")
 
 
-    def count_history_tokens(self) -> int:
+    def _count_history_tokens(self) -> int:
         """
         Uses the tiktoken library to count the number of tokens stored in self.history.
         """
-        #print(self._reserialize_chat(self.history))
-        return _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model)
-        #return sum([len(encoding.encode(message.content)) for message in self.history.messages])
+        history_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model)
+        return history_tokens
+
+
+    def _count_function_schema_tokens(self, force_update: bool = True) -> int:
+        """
+        Uses the tiktoken library to count the number of tokens in the function schemas.
+
+        Args:
+            force_update (bool): If true, recompute the function schemas. Otherwise, use the cached count.
+
+        Returns:
+            The number of tokens in the function schemas.
+        """
+
+        if self.function_schema_tokens is not None and not force_update:
+            return self.function_schema_tokens
+
+        response_raw_w_functions = openai.ChatCompletion.create(
+                  model=self.model,
+                  temperature = 0,
+                  messages = [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'hi'}],
+                  functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
+                  function_call = "auto")
+       
+        response_raw_no_functions = openai.ChatCompletion.create(
+                  model=self.model,
+                  temperature = 0,
+                  messages = [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'hi'}])
+
+        diff = response_raw_w_functions['usage']['prompt_tokens'] - response_raw_no_functions['usage']['prompt_tokens']
+
+        self.function_schema_tokens = diff + 2 # I dunno why 2, a simple diff is just 2 off
+        return diff
+
 
     def help(self):
         """Returns information about this agent, including a list of callable methods and functions."""
@@ -129,10 +162,29 @@ class UtilityAgent:
 
         new_user_message = Message(role = "user", content = new_user_message, author = author, intended_recipient = self.name)
 
+        # import pprint
+        # pp = pprint.PrettyPrinter(indent=4)
+
+        # self.history.messages.append(new_user_message)
+
+        # num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
+        # new_history = None
+        # print(num_tokens)
+        # if num_tokens > 500:
+        #     #yield Message(role = "assistant", content = "Ah, just a second, our conversation is getting a bit long. Let me collect my thoughts.", author = self.name, intended_recipient = author)
+        #     self.history.messages[-1].content = "First, summarize our conversation so far, then answer the following question:\n\n" + new_user_message.content
+        #     new_history =  Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
+        #     new_history.messages.append(self.history.messages[-1])
+
         if yield_prompt_message:
             yield new_user_message
 
-        self.history.messages.append(new_user_message)
+
+
+        # if summary is not None:
+        #     summary = "This message is a continuation of a previous conversation, summarized as follows:\n\n" + summary + "\n\n" + "Please respond to the following user input:\n\n" + new_user_message.content
+        #     yield from self.new_chat(summary, yield_prompt_message = False, author = author)
+        #     return None
 
         try:
             response_raw = openai.ChatCompletion.create(
@@ -148,6 +200,25 @@ class UtilityAgent:
                 yield message
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
+
+        ## TODO: implement rolling summarization
+        ## Q: start new chat w/ updated system dialog maybe? in which case I'd need to keep track of the original system message,
+        ## otherwise 
+        # summary = self._summarize_history(self)
+        # if summary is not None:
+        #     pass
+
+
+    # def _summarize_and_respond(self, new_user_message) -> str:
+    #     """If the number of tokens in the history exceeds the given threshold, summarize the history and return the summary.
+            
+    #     Returns:
+    #         The summary of the history, or None if no summarization was performed."""
+        
+    #     summary_agent = UtilityAgent("Summarizer", "You are a summarizer agent. Your goal is to *accurately* summarize the given conversation to be approximately one quarter its current size. You will be providing this information to another agent who will continue the conversation from the summary, so be sure to include all relevant information.")
+    #     query = "Please summarize the following conversation for a new agent to continue from:" + "\n\n" + "\n\n".join([f"{m.author}: {m.content}" for m in self.history.messages[1:]]) # don't summarize the system message
+    #     result = list(summary_agent.new_chat(query))[-1].content
+    #     return result
 
 
     def _process_model_response(self, response_raw, intended_recipient) -> Chat:
