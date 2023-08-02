@@ -1,6 +1,8 @@
 # Agent Smith (AI)
 
-Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions.
+Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions to interact with the world.
+
+<!-- <img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" /> -->
 
 Be aware of the following:
 
@@ -15,7 +17,7 @@ The `examples` directory provides some examples, including:
 * `monarch_basic.py`: Illustrates how to extend the basic UtilityAgent to register APIs and define callable local methods, and how to interact with the agent by processing produced Message objects.
 * `monarch_cli.py`: Illustrates extending the CLIAgent, which itself extends the UtilityAgent to provide a command-line chat interface.
 
-Here's an example conversation from `monarch_cli.py` (sadly, colors are not shown here):
+Here's an example conversation from `monarch_cli.py` (sadly, markdown-defined colors and links are not shown here):
 
 
 ```
