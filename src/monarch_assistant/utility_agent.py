@@ -162,10 +162,11 @@ class UtilityAgent:
 
         new_user_message = Message(role = "user", content = new_user_message, author = author, intended_recipient = self.name)
 
+
+        self.history.messages.append(new_user_message)
+
         # import pprint
         # pp = pprint.PrettyPrinter(indent=4)
-
-        # self.history.messages.append(new_user_message)
 
         # num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
         # new_history = None
