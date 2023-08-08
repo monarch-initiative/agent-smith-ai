@@ -204,11 +204,16 @@ def main():
             confirmation = input()
             if confirmation.lower() != 'y':
                 sys.exit(0)
-        # elif message.role == "function":
-        #     continue
-        # else:
-        #     # Handle other messages
-        #     print(f"Message: {message.content}")
+        elif message.role == "function":
+            # we don't print the result here, the agent prints to stdout/stderr
+            continue
+        elif message.author == "User":
+            # no need to repeat the user back to themselves
+            continue
+        else:
+            # in fact let's just not not print anything else
+            continue
+            #sys.stderr.write(f"{message.content}\n")
 
 if __name__ == "__main__":
     main()
