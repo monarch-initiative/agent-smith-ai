@@ -46,6 +46,7 @@ def initialize(default_prompt="You are a helpful AI assistant that can execute c
             print("Existing profiles retained.")
         else:
             create_profile("default", default_prompt)
+            print("Existing default profile removed. New default profile created.")
 
     else:
         create_profile("default", default_prompt)

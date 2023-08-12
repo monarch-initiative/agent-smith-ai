@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 
 CONFIG_DIR = os.path.expanduser("~/.bash_ai")
 
@@ -20,6 +21,10 @@ def get_conversation_log_path(profile_name):
 
 def create_profile(profile_name, system_prompt, api_key=None):
     profile_dir = get_profile_dir(profile_name)
+    # remove directory if it exists
+    if os.path.exists(profile_dir):
+        shutil.rmtree(profile_dir)
+
     os.makedirs(profile_dir, exist_ok=True)
     
     config = {
@@ -38,3 +43,13 @@ def read_profile_config(profile_name):
         with open(config_path, 'r') as file:
             return json.load(file)
     return {}
+
+def read_last_n_lines(file_path, n):
+    if not os.path.exists(file_path):
+        return []
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        return lines[-n:]
+
+
+
