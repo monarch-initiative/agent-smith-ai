@@ -39,17 +39,21 @@ class UtilityAgent:
         elif "OPENAI_API_KEY" in os.environ:
             openai.api_key = os.environ["OPENAI_API_KEY"]
         else:
-            raise ValueError("No OpenAI API key found. Please set the OPENAI_API_KEY environment variable or provide it during agent instantiation.")
+            raise ValueError("No OpenAI API key found. Please set the OPENAI_API_KEY environment varable or provide it during agent instantiation.")
 
-        self.model = model
         self.name = name
+        self.model = model
+
+        self.auto_summarize = auto_summarize_buffer_tokens
+        self.summarize_quietly = summarize_quietly
+
         self.system_message = system_message
         self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
     
         self.api_set = APIWrapperSet([])
         self.callable_methods = []
 
-        self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached
+        self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached; being lazy speeds up agent initialization
         self.register_callable_methods(["time", "help"])
 
 
@@ -97,7 +101,8 @@ class UtilityAgent:
 
     def _count_function_schema_tokens(self, force_update: bool = True) -> int:
         """
-        Uses the tiktoken library to count the number of tokens in the function schemas.
+        Counts tokens used by current function definition set, which counts against the conversation token limit. 
+        Makes a couple of API calls to OpenAI to do so, and the result is cached unless force_update is True.
 
         Args:
             force_update (bool): If true, recompute the function schemas. Otherwise, use the cached count.
@@ -123,7 +128,7 @@ class UtilityAgent:
 
         diff = response_raw_w_functions['usage']['prompt_tokens'] - response_raw_no_functions['usage']['prompt_tokens']
 
-        self.function_schema_tokens = diff + 2 # I dunno why 2, a simple diff is just 2 off
+        self.function_schema_tokens = diff + 2 # I dunno why 2, a simple difference is just 2 off. start/end tokens possibly?
         return diff
 
 
@@ -157,10 +162,10 @@ class UtilityAgent:
 
         user_message = Message(role = "user", content = user_message, author = author, intended_recipient = self.name)
 
+        self.history.messages.append(user_message)
+
         if yield_prompt_message:
             yield user_message
-
-        self.history.messages.append(user_message)
         
         try:
             response_raw = openai.ChatCompletion.create(
@@ -172,8 +177,8 @@ class UtilityAgent:
 
             for message in self._process_model_response(response_raw, intended_recipient = author):
                 self.history.messages.append(message)
-                ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
                 yield message
+                yield from self._summarize_if_necessary()
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
 
@@ -189,27 +194,10 @@ class UtilityAgent:
 
         self.history.messages.append(new_user_message)
 
-        # import pprint
-        # pp = pprint.PrettyPrinter(indent=4)
-
-        # num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
-        # new_history = None
-        # print(num_tokens)
-        # if num_tokens > 500:
-        #     #yield Message(role = "assistant", content = "Ah, just a second, our conversation is getting a bit long. Let me collect my thoughts.", author = self.name, intended_recipient = author)
-        #     self.history.messages[-1].content = "First, summarize our conversation so far, then answer the following question:\n\n" + new_user_message.content
-        #     new_history =  Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
-        #     new_history.messages.append(self.history.messages[-1])
-
         if yield_prompt_message:
             yield new_user_message
 
-
-
-        # if summary is not None:
-        #     summary = "This message is a continuation of a previous conversation, summarized as follows:\n\n" + summary + "\n\n" + "Please respond to the following user input:\n\n" + new_user_message.content
-        #     yield from self.new_chat(summary, yield_prompt_message = False, author = author)
-        #     return None
+        yield from self._summarize_if_necessary()
 
         try:
             response_raw = openai.ChatCompletion.create(
@@ -221,29 +209,43 @@ class UtilityAgent:
 
             for message in self._process_model_response(response_raw, intended_recipient = author):
                 self.history.messages.append(message)
-                ## TODO: check for running out of context length here and delegate to summarizer agent to refresh confo if needed
                 yield message
+                yield from self._summarize_if_necessary()
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
 
-        ## TODO: implement rolling summarization
-        ## Q: start new chat w/ updated system dialog maybe? in which case I'd need to keep track of the original system message,
-        ## otherwise 
-        # summary = self._summarize_history(self)
-        # if summary is not None:
-        #     pass
 
 
-    # def _summarize_and_respond(self, new_user_message) -> str:
-    #     """If the number of tokens in the history exceeds the given threshold, summarize the history and return the summary.
+    # this should only be called if the last message in the history is *not* the assistant or a function call:
+    # - it's built to check after the incoming user message: if the total length of the chat plus the user message results in fewer than summary_buffer_tokens,
+    #   then it will yield a pause message, a summary, and contiue from there. The history will be reset, with the new first message including the summary and the message
+    # - this could also be triggered after a function result, which acts like the user message in the above case
+    # - note that the yielded conversation diverges from history quite a bit here
+    def _summarize_if_necessary(self):
+        if self.auto_summarize is not None and len(self.history.messages) > 1 and self.history.messages[-1].role != "assistant" and not self.history.messages[-1].is_function_call:
             
-    #     Returns:
-    #         The summary of the history, or None if no summarization was performed."""
-        
-    #     summary_agent = UtilityAgent("Summarizer", "You are a summarizer agent. Your goal is to *accurately* summarize the given conversation to be approximately one quarter its current size. You will be providing this information to another agent who will continue the conversation from the summary, so be sure to include all relevant information.")
-    #     query = "Please summarize the following conversation for a new agent to continue from:" + "\n\n" + "\n\n".join([f"{m.author}: {m.content}" for m in self.history.messages[1:]]) # don't summarize the system message
-    #     result = list(summary_agent.new_chat(query))[-1].content
-    #     return result
+            new_user_message = self.history.messages[-1]
+            author = new_user_message.author
+
+            num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
+            if num_tokens > _context_size(self.model) - self.auto_summarize:
+                if not self.summarize_quietly:
+                    yield Message(role = "assistant", content = "I'm sorry, this conversation is getting too long for me to remember fully. I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
+
+                summary_agent = UtilityAgent(name = "Summarizer", model = self.model, auto_summarize_buffer_tokens = None)
+                summary_agent.history.messages = [message for message in self.history.messages]
+                summary_str = list(summary_agent.continue_chat(new_user_message = "Please summarize our conversation so far. The goal is to be able to continue our conversation from the summary only. Do not editorialize or ask any questions.", 
+                                                      author = author))[0].content
+                
+                self.history.messages = [self.history.messages[0]] # reset with the system prompt
+                # modify the last message to include the summary 
+                new_user_message.content = "Here is a summary of our conversation thus far:\n\n" + summary_str + "\n\nNow, please respond to the following as if we were continuing the conversation naturally:\n\n" + new_user_message.content
+                # we have to add it back to the now reset history
+                self.history.messages.append(new_user_message)
+
+                if not self.summarize_quietly:
+                    yield Message(role = "assistant", content = "Previous conversation summary: " + summary_str + "\n\nThanks for your patience. If I've missed anything important, please mention it before we continue.", author = self.name, intended_recipient = author)
+
 
 
     def _process_model_response(self, response_raw, intended_recipient) -> Chat:
@@ -448,6 +450,15 @@ def _generate_schema(fn):
     return schema
 
 
+def _context_size(model = "gpt-3.5-turbo-0613"):
+    if "gpt-4" in model and "32k" in model:
+        return 32768
+    elif "gpt-4" in model:
+        return 8192
+    elif "gpt-3.5" in model and "16k" in model:
+        return 16384
+    else:
+        return 4096
 
 ## Straight from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 def _num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
@@ -489,3 +500,4 @@ def _num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
                 num_tokens += tokens_per_name
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
+
