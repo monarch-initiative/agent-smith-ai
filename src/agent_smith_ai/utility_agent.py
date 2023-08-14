@@ -17,7 +17,23 @@ from agent_smith_ai.models import *
 
 
 class UtilityAgent:
-    def __init__(self, name: str = "Assistant", system_message: str = "You are a helpful assistant.", model: str = "gpt-3.5-turbo-0613", openai_api_key = None):
+    def __init__(self, 
+                 name: str = "Assistant",
+                 system_message: str = "You are a helpful assistant.",
+                 model: str = "gpt-3.5-turbo-0613",
+                 openai_api_key: str = None,
+                 auto_summarize_buffer_tokens: Union[int, None] = 500,
+                 summarize_quietly: bool = False):
+        """A UtilityAgent is an AI-powered chatbot that can call API endpoints and local methods.
+        
+        Args:
+            name (str, optional): The name of the agent. Defaults to "Assistant".
+            system_message (str, optional): The system message to display when the agent is initialized. Defaults to "You are a helpful assistant.".
+            model (str, optional): The OpenAI model to use for function calls. Defaults to "gpt-3.5-turbo-0613".
+            openai_api_key (str, optional): The OpenAI API key to use for function calls. Defaults to None. If not provided, it will be read from the OPENAI_API_KEY environment variable.
+            auto_summarize_buffer_tokens (Union[int, None], optional): Automatically summarize the conversation every time the buffer reaches this many tokens. Defaults to 500. Set to None to disable automatic summarization.
+            summarize_quietly (bool, optional): Whether to yield messages alerting the user to the summarization process. Defaults to False."""
+ 
         if openai_api_key is not None:
             openai.api_key = openai_api_key
         elif "OPENAI_API_KEY" in os.environ:
@@ -39,6 +55,14 @@ class UtilityAgent:
 
 
     def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []):
+        """Registers an API with the agent. The agent will be able to call the API's endpoints.
+        
+        Args:
+            name (str): The name of the API (to disambiguate APIs with conflicting endpoints).
+            spec_url (str): The URL of the API's OpenAPI specification. Must be a URL to a JSON file. 
+            base_url (str): The base URL of the API.
+            
+        """
         self.api_set.add_api(name, spec_url, base_url, callable_endpoints)
 
     def register_callable_methods(self, method_names: List[str]):

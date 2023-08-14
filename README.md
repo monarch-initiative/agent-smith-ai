@@ -7,7 +7,6 @@ Agent smith makes it easy to instantiate AI agents that can safely and easily ca
 Be aware of the following:
 
 * It is designed to use OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling) and thus requires an OpenAI API key.
-* There is currently no functionality for auto-summarizing long conversations - once the token limit is reached errors will occur.
 
 
 ## Examples
