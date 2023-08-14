@@ -17,7 +17,15 @@ from agent_smith_ai.models import *
 
 
 class UtilityAgent:
-    def __init__(self, name: str = "Assistant", system_message: str = "You are a helpful assistant.", model: str = "gpt-3.5-turbo-0613", openai_api_key = None, auto_summarize_buffer_tokens: Union[int, None] = 3000):
+    def __init__(self, 
+                 name: str = "Assistant",
+                 system_message: str = "You are a helpful assistant.",
+                 model: str = "gpt-3.5-turbo-0613",
+                 openai_api_key = None,
+                 auto_summarize_buffer_tokens: Union[int, None] = 500,
+                 summarize_quietly = False):
+        
+ 
         if openai_api_key is not None:
             openai.api_key = openai_api_key
         elif "OPENAI_API_KEY" in os.environ:
@@ -25,9 +33,12 @@ class UtilityAgent:
         else:
             raise ValueError("No OpenAI API key found. Please set the OPENAI_API_KEY environment varable or provide it during agent instantiation.")
 
-        self.model = model
         self.name = name
+        self.model = model
+
         self.auto_summarize = auto_summarize_buffer_tokens
+        self.summarize_quietly = summarize_quietly
+
         self.system_message = system_message
         self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
     
@@ -202,7 +213,8 @@ class UtilityAgent:
 
             num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
             if num_tokens > _context_size(self.model) - self.auto_summarize:
-                yield Message(role = "assistant", content = "I'm sorry, this conversation is getting to long for me to remember fully. I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
+                if not self.summarize_quietly:
+                    yield Message(role = "assistant", content = "I'm sorry, this conversation is getting too long for me to remember fully. I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
 
                 summary_agent = UtilityAgent(name = "Summarizer", model = self.model, auto_summarize_buffer_tokens = None)
                 summary_agent.history.messages = [message for message in self.history.messages]
@@ -215,7 +227,8 @@ class UtilityAgent:
                 # we have to add it back to the now reset history
                 self.history.messages.append(new_user_message)
 
-                yield Message(role = "assistant", content = "Previous conversation summary: " + summary_str + "\n\nThanks for your patience. If I've missed anything important, please mention it before we continue.", author = self.name, intended_recipient = author)
+                if not self.summarize_quietly:
+                    yield Message(role = "assistant", content = "Previous conversation summary: " + summary_str + "\n\nThanks for your patience. If I've missed anything important, please mention it before we continue.", author = self.name, intended_recipient = author)
 
 
 
