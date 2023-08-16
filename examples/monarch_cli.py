@@ -22,7 +22,7 @@ class MonarchAgent(CLIAgent):
             IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
             """).strip()
         # call the parent constructor providing a name for the agent and the system message
-        super().__init__(name, system_message)
+        super().__init__(name, system_message, model = "gpt-3.5-turbo-16k-0613")
 
         # register some API endpoints (inherited fro UtilityAgent)
         self.register_api("monarch", 

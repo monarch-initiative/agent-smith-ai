@@ -3,7 +3,7 @@ from datetime import datetime
 import inspect
 import os
 import json
-from typing import Any, Dict, List, Union, Literal, get_args, get_origin
+from typing import Any, Dict, List, Union, Literal, get_args, get_origin, Generator, Callable
 
 # Third party imports
 from docstring_parser import parse
@@ -23,7 +23,7 @@ class UtilityAgent:
                  model: str = "gpt-3.5-turbo-0613",
                  openai_api_key: str = None,
                  auto_summarize_buffer_tokens: Union[int, None] = 500,
-                 summarize_quietly: bool = False):
+                 summarize_quietly: bool = False) -> None:
         """A UtilityAgent is an AI-powered chatbot that can call API endpoints and local methods.
         
         Args:
@@ -58,28 +58,44 @@ class UtilityAgent:
 
 
 
-    def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []):
+    def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []) -> None:
         """Registers an API with the agent. The agent will be able to call the API's endpoints.
         
         Args:
             name (str): The name of the API (to disambiguate APIs with conflicting endpoints).
             spec_url (str): The URL of the API's OpenAPI specification. Must be a URL to a JSON file. 
             base_url (str): The base URL of the API.
-            
+            callable_endpoints (List[str], optional): A list of endpoint names that the agent can call. Defaults to [].
         """
         self.api_set.add_api(name, spec_url, base_url, callable_endpoints)
 
-    def register_callable_methods(self, method_names: List[str]):
+    def register_callable_methods(self, method_names: List[str]) -> None:
+        """Registers methods with the agent. The agent will be able to call these methods.
+        
+        Args:
+            method_names (List[str]): A list of method names that the agent can call."""
         for method_name in method_names:
             self.callable_methods.append(method_name)
 
 
-    def _get_method_schemas(self):
+    def _get_method_schemas(self) -> List[Dict[str, Any]]:
+        """Gets the schemas for the agent's callable methods.
+        
+        Returns:
+            A list of schemas for the agent's callable methods."""
         methods = inspect.getmembers(self, predicate=inspect.ismethod)
         return [_generate_schema(m[1]) for m in methods if m[0] in self.callable_methods]
 
 
-    def _call_method(self, method_name: str, params: dict):
+    def _call_method(self, method_name: str, params: dict) -> Generator[Message, None, None]:
+        """Calls one of the agent's callable methods.
+        
+        Args:
+            method_name (str): The name of the method to call.
+            params (dict): The parameters to pass to the method.
+            
+        Yields:
+            One or more messages containing the result of the method call."""
         method = getattr(self, method_name, None)
         if method is not None and callable(method):
             result = method(**params)
@@ -94,6 +110,9 @@ class UtilityAgent:
     def _count_history_tokens(self) -> int:
         """
         Uses the tiktoken library to count the number of tokens stored in self.history.
+
+        Returns: 
+            The number of tokens in self.history.
         """
         history_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model)
         return history_tokens
@@ -132,7 +151,7 @@ class UtilityAgent:
         return diff
 
 
-    def help(self):
+    def help(self) -> Dict[str, Any]:
         """Returns information about this agent, including a list of callable methods and functions."""
         return {"callable_methods": self._get_method_schemas() + self.api_set.get_function_schemas(), 
                 "system_prompt": self.system_message,
@@ -140,7 +159,7 @@ class UtilityAgent:
                 "chat_history_length": len(self.history.messages),
                 "model": self.model}
 
-    def time(self):
+    def time(self) -> str:
         """Get the current date and time.
 
         Returns: MM/DD/YY HH:MM formatted string.
@@ -151,10 +170,17 @@ class UtilityAgent:
 
 
 
-    def new_chat(self, user_message: str, yield_system_message = False, yield_prompt_message = False, author = "User") -> Chat:
+    def new_chat(self, user_message: str, yield_system_message = False, yield_prompt_message = False, author = "User") -> Generator[Message, None, None]:
         """Starts a new chat with the given system message and user message.
-        If the response contains <eval> tags, a response back to the model with the evaluated results will be added to the conversation. See the replace_eval_tags() function for more details.
-        Example usage: start_new_chat("You are a helpful assistant.", "Hi!")"""
+        
+        Args:
+            user_message (str): The user's first message.
+            yield_system_message (bool, optional): If true, yield the system message in the output stream as well. Defaults to False.
+            yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
+            author (str, optional): The name of the user. Defaults to "User".
+            
+        Yields:
+            One or more messages from the agent."""
         self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
 
         if yield_system_message:
@@ -184,10 +210,13 @@ class UtilityAgent:
 
 
 
-    def continue_chat(self, new_user_message: str, yield_prompt_message = False, author = "User") -> Chat:
-        """Continues a chat with the given messages and new user message.
-        If the response contains <eval> tags, a response back to the model with the evaluated results will be added to the conversation. See the replace_eval_tags() function for more details.
-        Example usage: continue_chat([{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "Hi!"}, {"role": "assistant", "content": "Hello, how can I help today?"}], "What are pillows?")"""
+    def continue_chat(self, new_user_message: str, yield_prompt_message = False, author = "User") -> Generator[Message, None, None]:
+        """Continues a chat with the given user message from the agent's history.
+        
+        Args:
+            new_user_message (str): The user's message.
+            yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
+            author (str, optional): The name of the user. Defaults to "User"."""
 
         new_user_message = Message(role = "user", content = new_user_message, author = author, intended_recipient = self.name)
 
@@ -221,7 +250,14 @@ class UtilityAgent:
     #   then it will yield a pause message, a summary, and contiue from there. The history will be reset, with the new first message including the summary and the message
     # - this could also be triggered after a function result, which acts like the user message in the above case
     # - note that the yielded conversation diverges from history quite a bit here
-    def _summarize_if_necessary(self):
+    def _summarize_if_necessary(self) -> Generator[Message, None, None]:
+        """If that last message in the history is not the assistant or a function call, and the total length of the chat plus the user message results in fewer than summary_buffer_tokens,
+        then it will yield a pause message, a summary, and contiue from there. The history will be reset, with the new first message including the summary and the message.
+        This could also be triggered after a function result, which acts like the user message in the above case.
+        Note that the yielded conversation diverges from the agent's stored history quite a bit here.
+        
+        Yields:
+            One or more messages from the agent."""
         if self.auto_summarize is not None and len(self.history.messages) > 1 and self.history.messages[-1].role != "assistant" and not self.history.messages[-1].is_function_call:
             
             new_user_message = self.history.messages[-1]
@@ -248,7 +284,15 @@ class UtilityAgent:
 
 
 
-    def _process_model_response(self, response_raw, intended_recipient) -> Chat:
+    def _process_model_response(self, response_raw: Dict[str, Any], intended_recipient: str) -> Generator[Message, None, None]:
+        """Processes the raw response from the model, yielding one or more messages.
+        
+        Args:
+            response_raw (Dict[str, Any]): The raw response from the model.
+            intended_recipient (str): The name of the intended recipient of the message.
+            
+        Yields:
+            One or more messages from the agent."""
         finish_reason = response_raw["choices"][0]["finish_reason"]
         message = response_raw["choices"][0]["message"]
 
@@ -364,7 +408,14 @@ class UtilityAgent:
 
 
     def _reserialize_message(self, message: Message) -> Dict[str, Any]:
-        """Deserializes a message object into a dictionary of arguments; for converting internal messages format to the format used by the OpenAI API."""
+        """Reserializes a message object into a dictionary in the format used by the OpenAI API.
+        This is a helper function for _reserialize_chat.
+        
+        Args:
+            message (Message): The message to be reserialized.
+            
+        Returns:
+            Dict[str, Any]: The reserialized message."""
 
         if message.is_function_call:
             return {"role": message.role, 
@@ -380,7 +431,7 @@ class UtilityAgent:
 
 
     def _reserialize_chat(self, chat: Chat) -> List[Dict[str, Any]]:
-        """Deserializes a chat object into a list of dictionaries of arguments; for converting internal chat format to the format used by the OpenAI API."""
+        """Reserializes a chat object (like self.history) into a list of dictionaries in the format used by the OpenAI API."""
         messages = []
         for message in chat.messages:
             messages.append(self._reserialize_message(message))
@@ -390,7 +441,7 @@ class UtilityAgent:
 
 
 
-def _python_type_to_json_schema(py_type):
+def _python_type_to_json_schema(py_type: type) -> Dict[str, any]:
     """Translate Python typing annotation to JSON schema-like types."""
     origin = get_origin(py_type)
     if origin is None:  # means it's a built-in type
@@ -428,8 +479,14 @@ def _python_type_to_json_schema(py_type):
     
 
 
-def _generate_schema(fn):
-    """Generate JSON schema for a function."""
+def _generate_schema(fn: Callable) -> Dict[str, Any]:
+    """Generate JSON schema for a function. Used to generate the function schema for a local method.
+    
+    Args:
+        fn (Callable): The function to generate the schema for.
+        
+    Returns:
+        Dict[str, Any]: The generated schema."""
     docstring = parse(fn.__doc__)
     sig = inspect.signature(fn)
     params = sig.parameters
@@ -450,7 +507,14 @@ def _generate_schema(fn):
     return schema
 
 
-def _context_size(model = "gpt-3.5-turbo-0613"):
+def _context_size(model: str = "gpt-3.5-turbo-0613") -> int:
+    """Return the context size for a given model.
+    
+    Args:
+        model (str, optional): The model to get the context size for. Defaults to "gpt-3.5-turbo-0613".
+        
+    Returns:
+        int: The context size for the given model."""
     if "gpt-4" in model and "32k" in model:
         return 32768
     elif "gpt-4" in model:
@@ -461,8 +525,17 @@ def _context_size(model = "gpt-3.5-turbo-0613"):
         return 4096
 
 ## Straight from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
-def _num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
-    """Return the number of tokens used by a list of messages."""
+def _num_tokens_from_messages(messages: List[Dict[str, Any]], model="gpt-3.5-turbo-0613") -> int:
+    """Return the number of tokens used by a list of messages. 
+    As provided by https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb (Aug 2023).
+    
+    Args:
+        messages (List[Dict[str, Any]]): The messages to count the tokens of.
+        model (str, optional): The model to use for tokenization. Defaults to "gpt-3.5-turbo-0613".
+
+    Returns:
+        int: The number of tokens used by the messages.
+    """
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
