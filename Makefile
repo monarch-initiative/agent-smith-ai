@@ -16,6 +16,10 @@ export-requirements:
 install:
 	poetry install
 
+.PHONY: docs
+docs:
+	poetry run $(MAKE) -C docs html
+
 cli-monarch: 
 	poetry run python3 examples/monarch_cli.py
 
@@ -23,6 +27,7 @@ help:
 	@echo ""
 	@echo "make all -- installs requirements, exports requirements.txt, runs chat cli"
 	@echo "make test -- runs tests"
+	@echo "make docs -- build docs"
 	@echo "make cli-monarch -- runs the example monarch cli"
 	@echo "make help -- show this help"
 	@echo ""
