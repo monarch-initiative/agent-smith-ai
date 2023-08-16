@@ -88,13 +88,13 @@ for message in agent.new_chat(question, yield_system_message = True, yield_promp
 
     ## the author and intended_recipient may be useful for multi-agent conversions or logging, they will typically be filled 
     ## with agent names, "User", or the agent name and the function it is trying to call
-    print("\n\n", message.dict())
+    print("\n\n", message.model_dump())
 
 ## agent.continue_chat(question) works just like .new_chat(), but doesn't allow including the system message
 question_followup = "What other diseases are associated with the first one you listed?"
 for message in agent.continue_chat(question_followup, yield_prompt_message = True, author = "User"):
-    print("\n\n", message.dict())
+    print("\n\n", message.model_dump())
 
 question_followup = "What is the entropy of a standard tile set in Scrabble?"
 for message in agent.continue_chat(question_followup, yield_prompt_message = True, author = "User"):
-    print("\n\n", message.dict())
+    print("\n\n", message.model_dump())

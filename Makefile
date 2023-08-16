@@ -23,6 +23,19 @@ docs:
 cli-monarch: 
 	poetry run python3 examples/monarch_cli.py
 
+publish-test:
+	rm -r dist/*
+	poetry build
+	twine upload -r testpypi dist/*
+
+
+publish:
+	rm -r dist/*
+	poetry build
+	twine upload dist/*
+
+
+
 help:
 	@echo ""
 	@echo "make all -- installs requirements, exports requirements.txt, runs chat cli"
