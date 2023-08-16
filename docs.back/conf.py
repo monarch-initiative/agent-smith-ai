@@ -6,6 +6,10 @@
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.abspath('../src'))
+sys.path.insert(0, os.path.abspath('../'))
+
 from datetime import date
 from agent_smith_ai import __version__
 # -- Project information -----------------------------------------------------
@@ -13,7 +17,7 @@ from agent_smith_ai import __version__
 
 project = 'monarch-assistant'
 copyright = f"{date.today().year}, Shawn T. O'Neil <shawn@tislab.org>"
-author = 'Shawn T. O'Neil <shawn@tislab.org>'
+author = "Shawn T. O'Neil <shawn@tislab.org>"
 release = __version__
 
 # -- General configuration ---------------------------------------------------
@@ -24,7 +28,7 @@ extensions = [
     "sphinx.ext.githubpages",
     "sphinx_rtd_theme",
     "sphinx_click",
-    "sphinx_autodoc_typehints",
+    #"sphinx_autodoc_typehints",
     "myst_parser"
 ]
 

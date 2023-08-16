@@ -16,7 +16,18 @@ import json
 import sys
 
 class CLIAgent(UtilityAgent):
-    def __init__(self, name: str = "Assistant", system_message: str = f"You are a helpful assistant.", model: str = "gpt-3.5-turbo-0613", openai_api_key = None, dotfile_history = True):
+    """An agent designed for interactive, multi-turn chats on the command line. Inherits from UtilityAgent, and may be inherited from to create custom command-line agents."""
+
+    def __init__(self, name: str = "Assistant", system_message: str = f"You are a helpful assistant.", model: str = "gpt-3.5-turbo-0613", openai_api_key: str = None, dotfile_history: bool = True) -> None:
+        """Initializes the agent.
+        
+        Args:
+            name (str, optional): The name of the agent. Defaults to "Assistant".
+            system_message (str, optional): The system message provided to the agent. Defaults to f"You are a helpful assistant named {name}."
+            model (str, optional): The model to use for the agent. Defaults to "gpt-3.5-turbo-0613".
+            openai_api_key (str, optional): The OpenAI API key to use for the agent. Defaults to None, which will use the OPENAI_API_KEY environment variable.
+            dotfile_history (bool, optional): Whether to save the agent's history to a dotfile. Defaults to True."""
+
         super().__init__(name, system_message, model, openai_api_key)
         self.dotfile_history = dotfile_history
 
@@ -41,34 +52,46 @@ class CLIAgent(UtilityAgent):
         os.environ["SHOW_FUNCTION_CALLS"] = 'False'
 
 
-    def show_function_calls(self):
+    def show_function_calls(self) -> None:
         """
-        Sets function calls to hidden.
+        Sets function calls and results to visible.
         """
         os.environ["SHOW_FUNCTION_CALLS"] = 'True'
 
 
-    def hide_function_calls(self):
+    def hide_function_calls(self) -> None:
         """
-        Sets function calls to visible.
+        Sets function calls and results to hidden.
         """
         os.environ["SHOW_FUNCTION_CALLS"] = 'False'
 
 
-    def log_history(self):
+    def log_history(self) -> Dict[str, Any]:
         """
-        Logs the message history.
+        Return the full chat history, for debugging purposes.
+
+        Returns:
+            Dict[str, Any]: The full chat history.
         """
-        return self.history.dict()
+        return self.history.model_dump()
     
-    def exit(self):
+    def exit(self) -> None:
         """
         Exits the chat.
         """
         sys.exit(0)
 
-    def render_panel(self, content: str, title: str, style = "default", title_align: str = "left", newline = True):
-        """Renders a panel with the given content and title."""
+
+    def render_panel(self, content: str, title: str, style = "default", title_align: str = "left", newline: bool = True) -> None:
+        """Renders a panel with the given content and title.
+        
+        Args:
+            content (str): The content to render.
+            title (str): The title of the panel.
+            style (str, optional): The style of the panel. Defaults to "default".
+            title_align (str, optional): The alignment of the title. Defaults to "left".
+            newline (bool, optional): Whether to print a newline before the panel. Defaults to True.
+        """
         console = Console(width = 100)
         title = Text(title, style = style)
         if self._is_valid_json(content):
@@ -78,7 +101,8 @@ class CLIAgent(UtilityAgent):
         console.print(Panel(Markdown(f"{content}"), title = title, title_align=title_align))
 
 
-    def start_chat_ui(self):
+    def start_chat_ui(self) -> None:
+        """Starts the chat UI, prompting the user for an initial message."""
         user_input = self.prompt_session.prompt([('class:prompt', 'User: ')])
 
         for message in self.new_chat(user_input):
@@ -92,6 +116,7 @@ class CLIAgent(UtilityAgent):
 
 
     def _is_valid_json(self, myjson: str) -> bool:
+        """Checks if a string is valid JSON."""
         try:
             json.loads(myjson)
         except json.JSONDecodeError:
@@ -99,7 +124,8 @@ class CLIAgent(UtilityAgent):
         return True
 
 
-    def _log_message(self, message: Message):
+    def _log_message(self, message: Message) -> None:
+        """Logs a message to the console using render_panel."""
 
         if message.role == "user":
             self.render_panel(message.content, message.author + " -> " + message.intended_recipient, style = "cyan")
