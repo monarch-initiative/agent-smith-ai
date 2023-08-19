@@ -57,30 +57,30 @@ function App() {
   return (
     <div className="App">
       <div className="chatWindow">
-        {chatLog.map((message, index) => {
-          if (!showFunctionMessages && message.role === "function") {
-            return null;
-          }
-
-          const content = message.content || (message.is_function_call ? `${message.func_name}(${JSON.stringify(message.func_arguments)})` : '');
-
-          return (
-            <div key={index} className={`message ${message.role}`}>
-              <ReactMarkdown remarkPlugins={[gfm]}>{content}</ReactMarkdown>
-            </div>
-          );
-        })}
+        {chatLog.map((message, index) => (
+          <div key={index} className={`message ${message.role}`}>
+            {message.is_function_call ? (
+              <React.Fragment>
+                <span>{message.func_name}</span>
+                <span className="toggle-function">👁️</span> 
+              </React.Fragment>
+            ) : (
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            )}
+          </div>
+        ))}
       </div>
       <div className="chatInput">
-        <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Type your message..."/>
+        <input 
+          value={question} 
+          onChange={e => setQuestion(e.target.value)} 
+          placeholder="Type your message..."
+        />
         <button onClick={handleChat}>Send</button>
       </div>
-      <label>
-        <input type="checkbox" checked={showFunctionMessages} onChange={() => setShowFunctionMessages(!showFunctionMessages)} />
-        Show function messages
-      </label>
     </div>
   );
+  
 }
 
 export default App;

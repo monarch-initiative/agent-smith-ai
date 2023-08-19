@@ -10,16 +10,17 @@
 .chatWindow {
   border: 1px solid #ccc;
   padding: 20px;
-  width: 400px;
-  height: 400px;
+  width: 600px;
+  height: 450px;
   overflow-y: auto;
+  background-color: #f7f7f7;
 }
 
 .chatInput {
   margin-top: 20px;
   display: flex;
   justify-content: space-between;
-  width: 400px;
+  width: 450px;
 }
 
 input {
@@ -43,13 +44,36 @@ button:hover {
 }
 
 .message {
-  margin-bottom: 10px;
+  padding: 5px 5px;
+  margin: 10px 5px;
+  border-radius: 5px;
 }
 
 .message.user {
-  text-align: right;
+  background-color: #E6F7FF;
+  align-self: flex-end;
+  margin-left: 20%;
+}
+
+.message p {
+  /*small top margin only*/
+  margin: 3px 0px 0px 0px;
+}
+
+.message.assistant {
+  background-color: #FFFFFF;
+  align-self: flex-start;
+  margin-right: 20%;
 }
 
 .message.function {
+  background-color: #EDEDED;
   font-family: 'Courier New', monospace;
+  color: #555555;
+}
+
+.toggle-function {
+  display: inline-block;
+  cursor: pointer;
+  margin-left: 5px;
 }
