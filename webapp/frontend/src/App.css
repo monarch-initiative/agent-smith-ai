@@ -41,3 +41,15 @@ button {
 button:hover {
   background-color: #0056b3;
 }
+
+.message {
+  margin-bottom: 10px;
+}
+
+.message.user {
+  text-align: right;
+}
+
+.message.function {
+  font-family: 'Courier New', monospace;
+}

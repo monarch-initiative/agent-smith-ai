@@ -9,6 +9,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+webapp/frontend/node_modules/
 .Python
 build/
 develop-eggs/
