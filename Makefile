@@ -26,6 +26,7 @@ help:
 	@echo "  make bash-ai-alias -- print alias for bash agent"
 	@echo ""
 
+build: install-dev docs webapp-build
 
 #### Basic ####
 
@@ -73,7 +74,7 @@ webapp-dev-stop:
 	killall npm
 
 webapp-build:
-	$(MAKE) -C src/agent_smith_ai/webapp build-static
+	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
 
 webapp-prod:
 	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
@@ -83,6 +84,8 @@ webapp-prod:
 webapp-prod-stop:
 	killall uvicorn
 
+agent-server-example:
+	poetry run python examples/agent_server.py
 
 ##### Bash Agent #####
 
