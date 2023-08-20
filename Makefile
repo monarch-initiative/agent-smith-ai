@@ -4,43 +4,89 @@ SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-all: install export-requirements chat
 
-test:
+help:
+	@echo ""
+	@echo "make help -- show this help"
+	@echo "BASIC"
+	@echo "  make install-dev -- install dependencies"
+	@echo "  make test-basic -- run basic tests"
+	@echo "  make example-cli-monarch -- run example CLI script"
+	@echo "PUBLISHING"
+	@echo "  make docs -- build documentation"
+	@echo "  make pypi-publish-test -- publish to test PyPI"
+	@echo "  make pypi-publish -- publish to PyPI"
+	@echo "WEBAPP"
+	@echo "  make webapp-dev -- run webapp in dev mode"
+	@echo "  make webapp-dev-stop -- stop webapp dev mode"
+	@echo "  make webapp-build -- build webapp static files"
+	@echo "  make webapp-prod -- run webapp in prod mode"
+	@echo "  make webapp-prod-stop -- stop webapp prod mode"
+	@echo "BASH AGENT"
+	@echo "  make bash-ai-alias -- print alias for bash agent"
+	@echo ""
+
+
+#### Basic ####
+
+install-dev:
+	poetry install
+
+# TODO: tests for different utilities (main class, bash agent, web ui)
+test-basic:
     # --capture=no to see stdout in logs for successful tests
 	poetry run pytest --capture=no -v tests
 
-export-requirements:
-	poetry export -f requirements.txt --output requirements.txt
+example-cli-monarch: 
+	poetry run python3 examples/monarch_cli.py
 
-install:
-	poetry install
+
+
+##### Publishing #####
 
 .PHONY: docs
 docs:
 	poetry run $(MAKE) -C docs html
 
-cli-monarch: 
-	poetry run python3 examples/monarch_cli.py
-
-publish-test:
+pypi-publish-test:
 	rm -r dist/*
+	poetry export -f requirements.txt --output requirements.txt
 	poetry build
 	twine upload -r testpypi dist/*
 
-
-publish:
+pypi-publish:
 	rm -r dist/*
+	poetry export -f requirements.txt --output requirements.txt
 	poetry build
 	twine upload dist/*
 
 
+##### Webapp #####
 
-help:
-	@echo ""
-	@echo "make all -- installs requirements, exports requirements.txt, runs chat cli"
-	@echo "make test -- runs tests"
-	@echo "make docs -- build docs"
-	@echo "make cli-monarch -- runs the example monarch cli"
-	@echo "make help -- show this help"
-	@echo ""
+webapp-dev:
+	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
+	sleep 1
+	$(MAKE) -C src/agent_smith_ai/webapp/frontend dev-npm-server
+
+webapp-dev-stop:
+	killall uvicorn
+	killall npm
+
+webapp-build:
+	$(MAKE) -C src/agent_smith_ai/webapp build-static
+
+webapp-prod:
+	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
+	sleep 1
+	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
+
+webapp-prod-stop:
+	killall uvicorn
+
+
+##### Bash Agent #####
+
+bash-ai-alias:
+	@echo "# source <(make bash-ai-alias) && ai --help"
+	@echo alias ai='poetry run python3 src/agent_smith_ai/bash_agent/main.py'
+
