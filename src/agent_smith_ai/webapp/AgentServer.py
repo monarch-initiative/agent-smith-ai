@@ -7,9 +7,10 @@ from uuid import uuid4
 import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from agent_smith_ai.models import Message
 
 class AgentServer:
-    def __init__(self, agent_class, name: str = "Agent Smith"):
+    def __init__(self, agent_class, name: str = "Agent Smith", welcome_message = "Hi, I'm Agent Smith, an AI assistant. How can I help you today?"):
         self.app = FastAPI(title=name)
 
         # Setup CORS for the FastAPI app (for dev)
@@ -35,6 +36,7 @@ class AgentServer:
         async def catch_all(full_path: str):
             return FileResponse(BUILD_DIR / "index.html")
 
+        self.welcome_message = welcome_message
 
         self.sessions = {}
         self.agent_class = agent_class
@@ -54,6 +56,10 @@ class AgentServer:
 
     async def websocket_endpoint(self, websocket: WebSocket):
         await websocket.accept()
+        if self.welcome_message is not None:
+            welcome_message = Message(role = "assistant", author = self.name, intended_recipient = "User", content = self.welcome_message)
+            await websocket.send_json(welcome_message.model_dump())
+
         while True:
             data = await websocket.receive_json()
             question = data.get("question")
