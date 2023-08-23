@@ -362,6 +362,8 @@ class UtilityAgent:
                                   ## the intended recipient is the calling agent, noted as a function call
                                   intended_recipient = f"{self.name} ({func_name} function)",
                                   func_arguments = func_arguments)
+            
+            yield new_message
 
             ## next we need to call the function and get the result
             ## if the function is an API call, we call it and yield the result
