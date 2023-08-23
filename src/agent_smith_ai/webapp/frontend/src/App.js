@@ -6,7 +6,6 @@ import './App.css';
 function App() {
   const [chatLog, setChatLog] = useState([]);
   const [question, setQuestion] = useState('');
-  const [showFunctionMessages, setShowFunctionMessages] = useState(true);
   const ws = useRef(null);
 
   const getWebSocketUrl = () => {
@@ -14,7 +13,12 @@ function App() {
     return `${protocol}//${window.location.host}/ws/chat/`;
   }
 
-  const getSessionId = () => {
+  const getLocalSessionId = () => {
+    // If the user has a session id in local storage, use that.
+    // Otherwise, generate a new session id and store it in local storage.
+    if (!localStorage.getItem("sessionId")) { 
+      localStorage.setItem("sessionId", Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)); 
+    }
     return localStorage.getItem("sessionId");
   }
 
@@ -41,7 +45,7 @@ function App() {
   const handleChat = () => {
     const message = {
         question: question,
-        session_id: getSessionId()
+        session_id: getLocalSessionId()
     };
 
     if (ws.current.readyState !== WebSocket.OPEN) {

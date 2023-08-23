@@ -44,14 +44,12 @@ class AgentServer:
 
 
 
-    def get_agent_state(self, session_id=None):
-        if not session_id:
-            session_id = str(uuid4())
-        agent = self.sessions.get(session_id)
+    def get_agent_state(self, local_session_id: str):
+        agent = self.sessions.get(local_session_id)
         if not agent:
-            agent = self.agent_class(name=self.name)
-            self.sessions[session_id] = agent
-        return agent, session_id
+            agent = self.agent_class(name = self.name)
+            self.sessions[local_session_id] = agent
+        return agent
 
 
     async def websocket_endpoint(self, websocket: WebSocket):
@@ -60,12 +58,20 @@ class AgentServer:
             welcome_message = Message(role = "assistant", author = self.name, intended_recipient = "User", content = self.welcome_message)
             await websocket.send_json(welcome_message.model_dump())
 
+        data = await websocket.receive_json()
+        question = data.get("question")
+        local_session_id = data.get("local_session_id")
+        agent = self.get_agent_state(local_session_id)
+        responses = agent.new_chat(question, yield_prompt_message=True)
+        for message in responses:
+            await websocket.send_json(message.model_dump())
+
         while True:
             data = await websocket.receive_json()
             question = data.get("question")
-            session_id = data.get("session_id")
-            agent, session_id = self.get_agent_state(session_id)
-            responses = agent.new_chat(question, yield_prompt_message=True)
+            local_session_id = data.get("local_session_id")
+            agent = self.get_agent_state(local_session_id)
+            responses = agent.continue_chat(question, yield_prompt_message=True)
             for message in responses:
                 await websocket.send_json(message.model_dump())
 

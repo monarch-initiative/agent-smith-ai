@@ -60,3 +60,19 @@ def test_example_agent():
     for message in agent.continue_chat("Can you run me a 3 second timer?"):
         print("\n\n\nMESSAGE: ", message)
         assert message.role is not None        
+
+def test_agent_token_limiter():
+    agent = UtilityAgent(max_tokens = 10, token_refill_rate = 1)
+
+    # there result should be one message yielded
+    messages = agent.new_chat("Hi")
+    assert len(list(messages)) == 1
+
+    print(agent.token_bucket.tokens)
+    messages = list(agent.continue_chat("Hi"))
+    # this should result in an error because the agent has no tokens left
+    # the author will be "System"
+    assert len(messages) == 1
+    assert messages[0].author == "System"
+        
+

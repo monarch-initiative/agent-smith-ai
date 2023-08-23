@@ -13,6 +13,7 @@ import tiktoken
 # Local application imports
 from agent_smith_ai.openapi_wrapper import APIWrapperSet 
 from agent_smith_ai.models import *
+from agent_smith_ai.token_bucket import TokenBucket
 
 
 
@@ -23,7 +24,10 @@ class UtilityAgent:
                  model: str = "gpt-3.5-turbo-0613",
                  openai_api_key: str = None,
                  auto_summarize_buffer_tokens: Union[int, None] = 500,
-                 summarize_quietly: bool = False) -> None:
+                 summarize_quietly: bool = False,
+                 max_tokens: float = None,
+                 # in tokens/sec; 10000 tokens/hr = 10000 / 3600
+                 token_refill_rate: float = 10000.0 / 3600.0) -> None:
         """A UtilityAgent is an AI-powered chatbot that can call API endpoints and local methods.
         
         Args:
@@ -32,7 +36,10 @@ class UtilityAgent:
             model (str, optional): The OpenAI model to use for function calls. Defaults to "gpt-3.5-turbo-0613".
             openai_api_key (str, optional): The OpenAI API key to use for function calls. Defaults to None. If not provided, it will be read from the OPENAI_API_KEY environment variable.
             auto_summarize_buffer_tokens (Union[int, None], optional): Automatically summarize the conversation every time the buffer reaches this many tokens. Defaults to 500. Set to None to disable automatic summarization.
-            summarize_quietly (bool, optional): Whether to yield messages alerting the user to the summarization process. Defaults to False."""
+            summarize_quietly (bool, optional): Whether to yield messages alerting the user to the summarization process. Defaults to False.
+            max_tokens (float, optional): The number of tokens an agent starts with, and the maximum it can bank. Defaults to None (infinite/no token limiting).
+            token_refill_rate (float, optional): The number of tokens the agent gains per second. Defaults to 10000.0 / 3600.0 (10000 tokens per hour).
+            """
  
         if openai_api_key is not None:
             openai.api_key = openai_api_key
@@ -56,6 +63,7 @@ class UtilityAgent:
         self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached; being lazy speeds up agent initialization
         self.register_callable_methods(["time", "help"])
 
+        self.token_bucket = TokenBucket(tokens = max_tokens, refill_rate = token_refill_rate)
 
 
     def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []) -> None:
@@ -181,6 +189,8 @@ class UtilityAgent:
             
         Yields:
             One or more messages from the agent."""
+        
+
         self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
 
         if yield_system_message:
@@ -188,10 +198,17 @@ class UtilityAgent:
 
         user_message = Message(role = "user", content = user_message, author = author, intended_recipient = self.name)
 
-        self.history.messages.append(user_message)
-
         if yield_prompt_message:
             yield user_message
+
+        self.token_bucket.refill()
+        needed_tokens = self.compute_token_cost(user_message.content)
+        sufficient_budget = self.token_bucket.consume(needed_tokens)
+        if not sufficient_budget:
+            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = author)
+            return
+
+        self.history.messages.append(user_message)
         
         try:
             response_raw = openai.ChatCompletion.create(
@@ -202,8 +219,8 @@ class UtilityAgent:
                       function_call = "auto")
 
             for message in self._process_model_response(response_raw, intended_recipient = author):
-                self.history.messages.append(message)
                 yield message
+                self.history.messages.append(message)
                 yield from self._summarize_if_necessary()
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
@@ -218,13 +235,21 @@ class UtilityAgent:
             yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
             author (str, optional): The name of the user. Defaults to "User"."""
 
+
         new_user_message = Message(role = "user", content = new_user_message, author = author, intended_recipient = self.name)
-
-
-        self.history.messages.append(new_user_message)
 
         if yield_prompt_message:
             yield new_user_message
+            
+        self.token_bucket.refill()
+        needed_tokens = self.compute_token_cost(new_user_message.content)
+        sufficient_budget = self.token_bucket.consume(needed_tokens)
+        if not sufficient_budget:
+            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = author)
+            return
+            
+        self.history.messages.append(new_user_message)
+
 
         yield from self._summarize_if_necessary()
 
@@ -237,13 +262,26 @@ class UtilityAgent:
                       function_call = "auto")
 
             for message in self._process_model_response(response_raw, intended_recipient = author):
-                self.history.messages.append(message)
                 yield message
+
+                self.history.messages.append(message)
                 yield from self._summarize_if_necessary()
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
 
 
+    def compute_token_cost(self, proposed_message: str) -> int:
+        """Computes the total token count of the current history plus, plus function definitions, plus the proposed message. Can thus act
+        as a proxy for the cost of the proposed message at the current point in the conversation, and to determine whether a conversation
+        summary is necessary.
+        
+        Args:
+            proposed_message (str): The proposed message.
+            
+        Returns:
+            int: The total token count of the current history plus, plus function definitions, plus the proposed message."""
+        cost = self._count_history_tokens() + self._count_function_schema_tokens() + _num_tokens_from_messages([{"role": "user", "content": proposed_message}])
+        return cost
 
     # this should only be called if the last message in the history is *not* the assistant or a function call:
     # - it's built to check after the incoming user message: if the total length of the chat plus the user message results in fewer than summary_buffer_tokens,
@@ -295,6 +333,7 @@ class UtilityAgent:
             One or more messages from the agent."""
         finish_reason = response_raw["choices"][0]["finish_reason"]
         message = response_raw["choices"][0]["message"]
+        new_message = None
 
         ## The model is not trying to make a function call, 
         ## so we just return the message as-is
@@ -323,7 +362,6 @@ class UtilityAgent:
                                   ## the intended recipient is the calling agent, noted as a function call
                                   intended_recipient = f"{self.name} ({func_name} function)",
                                   func_arguments = func_arguments)
-            yield new_message
 
             ## next we need to call the function and get the result
             ## if the function is an API call, we call it and yield the result
@@ -342,7 +380,6 @@ class UtilityAgent:
                                       ## the intended recipient is the calling agent
                                       intended_recipient = self.name,
                                       is_function_call = False)
-                yield new_message
             
             ## if its not an API call, maybe it's one of the local callable methods
             elif func_name in self.callable_methods:
@@ -355,7 +392,7 @@ class UtilityAgent:
                     for potential_message in func_result:
                         # if it is a message already, just yield it to the stream
                         if isinstance(potential_message, Message):
-                            yield potential_message
+                            new_message = potential_message
                         else:
                             # otherwise we turn the result into a message and yield it
                             new_message = Message(role = "function", 
@@ -364,11 +401,10 @@ class UtilityAgent:
                                                   author = f"{self.name} ({func_name} function)",
                                                   intended_recipient = self.name,
                                                   is_function_call = False)
-                            yield new_message
 
 
                 except ValueError as e:
-                    yield Message(role = "function",
+                    new_message = Message(role = "function",
                                   content = f"Error in attempted method call: {str(e)}",
                                   func_name = func_name,
                                   author = f"{self.name} ({func_name} function)",
@@ -377,14 +413,26 @@ class UtilityAgent:
                     
             ## if the function isn't found, let the model know (this shouldn't happen)
             else:
-                yield Message(role = "function",
+                new_message = Message(role = "function",
                               content = f"Error: function {func_name} not found.",
                               func_name = None,
                               author = "System",
                               intended_recipient = self.name,
                               is_function_call = False
                               )
-                
+        
+        ## yield the message to the stream
+        yield new_message
+
+        ## check to see if there are tokens in the budget
+        self.token_bucket.refill()
+        needed_tokens = self.compute_token_cost(new_message.content)
+        sufficient_budget = self.token_bucket.consume(needed_tokens)
+        if not sufficient_budget:
+            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = intended_recipient)
+            return
+
+
         # if we've gotten here, there was a function call and a result
         # now we send the result back to the model for summarization for the caller or,
         # the model may want to make *another* function call, so it is processed recursively using the logic above
