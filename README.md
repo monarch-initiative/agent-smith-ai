@@ -1,22 +1,168 @@
 # Agent Smith (AI)
 
-Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions to interact with the world.
+Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions to interact with the world. It is currently designed to use OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling) and thus requires an OpenAI API key.
 
-<!-- <img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" /> -->
-
-Be aware of the following:
-
-* It is designed to use OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling) and thus requires an OpenAI API key.
+<img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" style="align: center;" /> 
 
 
-## Examples
+## Basic Usage
 
-The `examples` directory provides some examples, including:
+Primary functionality is provided by a `agent_smith_ai.utility_agent.UtilityAgent` class, which yields `Message` objects in response to user questions. They also manage internal state chat, including the system prompt, chat history, token usage, and auto-summarization when the conversation length nears the context length. Finally, using OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling), they can register endpoints of REST API's, and locally defined
+methods as callable functions.
 
-* `monarch_basic.py`: Illustrates how to extend the basic UtilityAgent to register APIs and define callable local methods, and how to interact with the agent by processing produced Message objects.
-* `monarch_cli.py`: Illustrates extending the CLIAgent, which itself extends the UtilityAgent to provide a command-line chat interface.
+Here's some code from the basic example in `examples/monarch_basic.py`, which makes calls to a [Monarch Initiative](https://monarchinitiative.org) API. We start by using `dotenv` to read a `.env` file defining our `OPENAI_API_KEY` environment variable 
+if present (we just need some way to access the key). We inherit from the `UtilityAgent` class, defining a name and system
+message for the agent. 
 
-Here's an example conversation from `monarch_cli.py` (sadly, markdown-defined colors and links are not shown here):
+```python
+from agent_smith_ai.utility_agent import UtilityAgent
+
+import textwrap
+import os
+from typing import Any, Dict
+
+# load environment variables from .env file
+import dotenv
+dotenv.load_dotenv()
+
+## A UtilityAgent can call API endpoints and local methods
+class MonarchAgent(UtilityAgent):
+
+    def __init__(self, name):
+        
+        ## define a system message
+        system_message = textwrap.dedent(f"""
+            You are the Monarch Assistant, an AI-powered chatbot that can answer questions about data from the Monarch Initiative knowledge graph. 
+            You can search for entities such as genes, diseases, and phenotypes by name to get the associated ontology identifier. 
+            You can retrieve associations between entities via their identifiers. 
+            Users may use synonyms such as 'illness' or 'symptom'. Do not assume the user is familiar with biomedical terminology. 
+            Always add additional information such as lay descriptions of phenotypes. 
+            If the user changes the show function call setting, do not make any further function calls immediately.
+            IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
+            """).strip()
+```
+
+Next in the constructor, we call the parent constructor which defines various agent properties. 
+
+```python
+        super().__init__(name,                                             # Name of the agent
+                         system_message,                                   # Openai system message
+                         model = "gpt-3.5-turbo-0613",                     # Openai model name
+                         openai_api_key = os.environ["OPENAI_API_KEY"],    # API key; will default to OPENAI_API_KEY env variable
+                         auto_summarize_buffer_tokens = 500,               # Summarize and clear the history when fewer than this many tokens remains in the context window. Checked prior to each message sent to the model.
+                         summarize_quietly = False,                        # If True, do not alert the user when a summarization occurs
+                         max_tokens = None,                                # maximum number of tokens this agent can bank (default: None, no limit)
+                         token_refill_rate = 10000.0 / 3600.0)             # number of tokens to add to the bank per second
+```
+
+Still in the constructor, we can register some API endpoints for the agent to call. It is possible to register multiple
+APIs.
+
+```python
+        ## register some API endpoints (inherited from UtilityAgent)
+        ## the openapi.json spec must be available at the spec_url:
+        ##    callable endpoints must have a "description" and "operationId"
+        ##    params can be in body or query, but must be fully specified
+        self.register_api("monarch",  # brief alphanumeric ID, used internally
+                          spec_url = "https://oai-monarch-plugin.monarchinitiative.org/openapi.json", 
+                          base_url = "https://oai-monarch-plugin.monarchinitiative.org",
+                          callable_endpoints = ['search_entity', 
+                                                'get_disease_gene_associations', 
+                                                'get_disease_phenotype_associations', 
+                                                'get_gene_disease_associations', 
+                                                'get_gene_phenotype_associations', 
+                                                'get_phenotype_gene_associations', 
+                                                'get_phenotype_disease_associations'])
+```
+
+Finally, the constructor is also where we register methods that the agent can call. Agent-callable methods are defined 
+like normal, but to be properly callable they should be type-annotated and documented with docstrings
+parsable by [docstring-parser](https://pypi.org/project/docstring-parser/). 
+
+```python
+        ## the agent can also call local methods, but we have to register them
+        self.register_callable_methods(['compute_entropy'])
+
+    ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
+    def compute_entropy(self, items: Dict[Any, int]) -> float:
+        """Compute the information entropy of a given set of item counts.
+        
+        Args:
+            items (str): A dictionary of items and their counts.
+            
+        Returns:
+            The information entropy of the item counts.
+        """
+        from math import log2
+        
+        total = sum(items.values())
+        return -sum([count / total * log2(count / total) for count in items.values()])
+```
+
+The above will allow the model to accurately answer questions like `"What is the entropy of the tile counts in a standard Scrabble set?"`! 
+
+To use the agent, we first instantiate it and define a question to ask. The agent's `.new_chat()` method takes the
+question and yields a stream of `Message` objects. It may yield multiple message objects if the agent decides
+to call a function to answer the question. The first yielded Message will have `is_function_call` set to `True` and
+information about the function call in other fields. The second message will be the result of the function call
+in `content` and `role` set to `"function"`; this is sent back to the model, resulting in a third message yielded with the
+models' response in `content` and `role` set to `"assistant`. It may be that the model's immediate response is *another* function
+call, in which case function calls and results will continue to be yielded. It is also possible to yield the system message to the
+stream with `yield_system_message` and the question itself with `yield_prompt_message` prior to the main message stream.
+
+Messages are `pydantic` models, so `message.model_dump()` converts each message to a dictionary.
+
+```python
+
+agent = MonarchAgent("Monarch Assistant")
+question = "What genes are associated with Cystic Fibrosis?"
+
+## agent.new_chat(question) may result in a series of Message objects (which may consist of a series of function-call messages,
+## function-call responses, and other messages)
+## by default, the system message and initial prompt question are not included in the output, but can be
+for message in agent.new_chat(question, yield_system_message = True, yield_prompt_message = True, author = "User"):
+    ## each Message object as the following attributes and defaults:
+        # role: str                                         // required, either "user", "assistant", or "function" (as used by OpenAI API)
+        # author: str = None                                // the name of the author of the message
+        # intended_recipient: str = None                    // the name of the intended recipient of the message
+        # is_function_call: bool = False                    // whether the message represents the model attemtpting to make a function call
+        # content: Optional[str] = None                     // the content of the message (as used by OpenAI API)
+        # func_name: Optional[str] = None                   // the function name the model is trying to call (if is_function_call is True)
+        # func_arguments: Optional[Dict[str, Any]] = None   // the function arguments the model is trying to pass (if is_function_call is True)
+        # finish_reason: Optional[str] = None               // (as used by the OpenAI API, largely ignorable)
+
+    ## the author and intended_recipient may be useful for multi-agent conversions or logging, they will typically be filled 
+    ## with agent names, "User", or the agent name and the function it is trying to call
+    print("\n\n", message.model_dump())
+```
+
+Once a chat has been initialized this way, it can be continued with `.continue_chat()` which operates in a similar way:
+
+```python
+## agent.continue_chat(question) works just like .new_chat(), but doesn't allow including the system message
+question_followup = "What other diseases are associated with the first one you listed?"
+for message in agent.continue_chat(question_followup, yield_prompt_message = True, author = "User"):
+    print("\n\n", message.model_dump())
+
+question_followup = "What is the entropy of a standard tile set in Scrabble?"
+for message in agent.continue_chat(question_followup, yield_prompt_message = True, author = "User"):
+    print("\n\n", message.model_dump())
+```
+
+
+## Additional Experiments and Examples
+
+These are not complete and may be moved, but the following are currently included here:
+
+**agent_smith_ai.CLIAgent**: A basic command-line agent with some formatting and markdown rendering provided by `rich`. May be inhereted in the same way as `UtilityAgent` for added functionality.
+
+**agent_smith_ai.webapp.AgentServer.AgentServer**: Serves UtilityAgent-based agents to a React-based frontend from a FastAPI backend. Client-side session IDs are used in conjunction with agent's token rate limiting to limit the number of messages a single user can send, but client-side protections are easy to bypass without authentication. **WARNING: this early code is not secure for production use!**
+
+**agent_smith_ai/bash_agent/main.py**: Early version of a command-line-based AI assistant that can write and execute (after confirmation) complex commands.
+
+
+Here's an example conversation from the `examples/monarch_cli.py` which uses the `CLIAgent` 
+(sadly, markdown-defined colors and links are not shown here):
 
 
 ```

@@ -30,9 +30,6 @@ class MonarchAgent(UtilityAgent):
             IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
             """).strip()
         
-        ## call the parent constructor providing a name for the agent and the system message
-        ## we can also specify the model (it must be an OpenAI function-calling model)
-        ## and the OpenAI API key (if not provided, it will be read from the OPENAI_API_KEY environment variable, here we do so explicity)
         super().__init__(name,                                             # Name of the agent
                          system_message,                                   # Openai system message
                          model = "gpt-3.5-turbo-0613",                     # Openai model name
@@ -61,7 +58,7 @@ class MonarchAgent(UtilityAgent):
         self.register_callable_methods(['compute_entropy'])
 
     ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
-    def compute_entropy(self, items: Dict[Any, int]):
+    def compute_entropy(self, items: Dict[Any, int]) -> float:
         """Compute the information entropy of a given set of item counts.
         
         Args:
