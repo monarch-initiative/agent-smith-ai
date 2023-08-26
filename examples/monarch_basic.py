@@ -33,7 +33,14 @@ class MonarchAgent(UtilityAgent):
         ## call the parent constructor providing a name for the agent and the system message
         ## we can also specify the model (it must be an OpenAI function-calling model)
         ## and the OpenAI API key (if not provided, it will be read from the OPENAI_API_KEY environment variable, here we do so explicity)
-        super().__init__(name, system_message, model = "gpt-3.5-turbo-0613", openai_api_key = os.environ["OPENAI_API_KEY"])
+        super().__init__(name,                                             # Name of the agent
+                         system_message,                                   # Openai system message
+                         model = "gpt-3.5-turbo-0613",                     # Openai model name
+                         openai_api_key = os.environ["OPENAI_API_KEY"],    # API key; will default to OPENAI_API_KEY env variable
+                         auto_summarize_buffer_tokens = 500,               # Summarize and clear the history when fewer than this many tokens remains in the context window. Checked prior to each message sent to the model.
+                         summarize_quietly = False,                        # If True, do not alert the user when a summarization occurs
+                         max_tokens = None,                                # maximum number of tokens this agent can bank (default: None, no limit)
+                         token_refill_rate = 10000.0 / 3600.0)             # number of tokens to add to the bank per second
 
         ## register some API endpoints (inherited from UtilityAgent)
         ## the openapi.json spec must be available at the spec_url:
