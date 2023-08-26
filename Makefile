@@ -91,5 +91,5 @@ agent-server-example:
 
 bash-ai-alias:
 	@echo "# source <(make bash-ai-alias) && ai --help"
-	@echo alias ai='poetry run python3 src/agent_smith_ai/bash_agent/main.py'
+	@echo alias ai=\'poetry run python3 src/agent_smith_ai/bash_agent/main.py\'
 
