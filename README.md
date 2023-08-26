@@ -2,7 +2,7 @@
 
 Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions to interact with the world. It is currently designed to use OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling) and thus requires an OpenAI API key.
 
-<img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" style="align: center;" /> 
+<!-- <img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" style="align: center;" />  -->
 
 
 ## Basic Usage
