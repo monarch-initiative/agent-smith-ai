@@ -114,6 +114,15 @@ class UtilityAgent:
         else:
             raise ValueError(f"No such method: {method_name}")
 
+    def set_api_key(self, key: str) -> None:
+        """Sets the OpenAI API key for the agent.
+
+        Args:
+            key (str): The OpenAI API key to use."""
+        openai.api_key = key
+        # the openai module caches the key, but we also need to set it in the environment
+        # as this overrides the cached value
+        os.environ["OPENAI_API_KEY"] = key
 
     def _count_history_tokens(self) -> int:
         """
