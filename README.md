@@ -627,3 +627,8 @@ User: Ok, show the function calls again, and tell me more about the CFTR gene.
 │ can have diverse effects on different organ systems.                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
+
+## Changelog
+
+* 0.12.0: Added toxicity check for user messages with OpenAI Moderation endpoint
+* 0.11.2: Added ability to swap out OpenAI API key for an active agent
