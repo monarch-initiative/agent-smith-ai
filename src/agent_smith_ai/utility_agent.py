@@ -27,7 +27,8 @@ class UtilityAgent:
                  summarize_quietly: bool = False,
                  max_tokens: float = None,
                  # in tokens/sec; 10000 tokens/hr = 10000 / 3600
-                 token_refill_rate: float = 10000.0 / 3600.0) -> None:
+                 token_refill_rate: float = 10000.0 / 3600.0,
+                 check_toxicity = True) -> None:
         """A UtilityAgent is an AI-powered chatbot that can call API endpoints and local methods.
         
         Args:
@@ -39,6 +40,7 @@ class UtilityAgent:
             summarize_quietly (bool, optional): Whether to yield messages alerting the user to the summarization process. Defaults to False.
             max_tokens (float, optional): The number of tokens an agent starts with, and the maximum it can bank. Defaults to None (infinite/no token limiting).
             token_refill_rate (float, optional): The number of tokens the agent gains per second. Defaults to 10000.0 / 3600.0 (10000 tokens per hour).
+            check_toxicity (bool, optional): Whether to check the toxicity of user messages using OpenAI's moderation endpoint. Defaults to True.
             """
  
         if openai_api_key is not None:
@@ -64,7 +66,7 @@ class UtilityAgent:
         self.register_callable_methods(["time", "help"])
 
         self.token_bucket = TokenBucket(tokens = max_tokens, refill_rate = token_refill_rate)
-
+        self.check_toxicity = check_toxicity
 
     def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []) -> None:
         """Registers an API with the agent. The agent will be able to call the API's endpoints.
@@ -219,6 +221,16 @@ class UtilityAgent:
 
         self.history.messages.append(user_message)
         
+        if self.check_toxicity:
+            try:
+                toxicity = openai.Moderation.create(input = user_message.content)
+                if toxicity['results'][0]['flagged']:
+                    yield Message(role = "assistant", content = f"I'm sorry, your message appears to contain inappropriate content. Please keep it civil.", author = "System", intended_recipient = author)
+                    return
+            except Exception as e:
+                yield Message(role = "assistant", content = f"Error in toxicity check: {str(e)}", author = "System", intended_recipient = author)
+                return
+
         try:
             response_raw = openai.ChatCompletion.create(
                       model=self.model,
@@ -259,6 +271,15 @@ class UtilityAgent:
             
         self.history.messages.append(new_user_message)
 
+        if self.check_toxicity:
+            try:
+                toxicity = openai.Moderation.create(input = new_user_message.content)
+                if toxicity['results'][0]['flagged']:
+                    yield Message(role = "assistant", content = f"I'm sorry, your message appears to contain inappropriate content. Please keep it civil.", author = "System", intended_recipient = author)
+                    return
+            except Exception as e:
+                yield Message(role = "assistant", content = f"Error in toxicity check: {str(e)}", author = "System", intended_recipient = author)
+                return
 
         yield from self._summarize_if_necessary()
 
@@ -277,6 +298,7 @@ class UtilityAgent:
                 yield from self._summarize_if_necessary()
         except Exception as e:
             yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
+
 
 
     def compute_token_cost(self, proposed_message: str) -> int:
