@@ -88,6 +88,11 @@ class UtilityAgent:
             self.callable_methods.append(method_name)
 
 
+    def clear_history(self):
+        """Clears the agent's history as though it were a new agent, but leaves the token bucket, model, and other information alone."""
+        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
+
+
     def _get_method_schemas(self) -> List[Dict[str, Any]]:
         """Gets the schemas for the agent's callable methods.
         

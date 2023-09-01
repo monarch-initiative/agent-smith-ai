@@ -630,5 +630,6 @@ User: Ok, show the function calls again, and tell me more about the CFTR gene.
 
 ## Changelog
 
+* 0.13.0: Added ability to clear history 
 * 0.12.0: Added toxicity check for user messages with OpenAI Moderation endpoint
 * 0.11.2: Added ability to swap out OpenAI API key for an active agent
