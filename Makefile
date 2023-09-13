@@ -64,28 +64,9 @@ pypi-publish:
 
 ##### Webapp #####
 
-webapp-dev:
-	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
-	sleep 1
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend dev-npm-server
+example-streamlit:
+	poetry run streamlit run examples/streamlit_server.py
 
-webapp-dev-stop:
-	killall uvicorn
-	killall npm
-
-webapp-build:
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
-
-webapp-prod:
-	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
-	sleep 1
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
-
-webapp-prod-stop:
-	killall uvicorn
-
-agent-server-example:
-	poetry run python examples/agent_server.py
 
 ##### Bash Agent #####
 
