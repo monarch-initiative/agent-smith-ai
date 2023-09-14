@@ -1,12 +1,13 @@
 import streamlit as st
-import os
-import dotenv
+import toml
 import logging
+import pathlib
 from agent_smith_ai.utility_agent import UtilityAgent
 
 
 def initialize_app_config(**kwargs):
     _initialize_session_state()
+    _ensure_streamlit_config()
     defaults = {
         "page_title": "Agent Smith AI",
         "page_icon": None,
@@ -24,27 +25,61 @@ def initialize_app_config(**kwargs):
     )
 
 def set_app_default_api_key(key):
-    _initialize_session_state()
+    # _initialize_session_state()
     st.session_state.default_api_key = key
     _update_agents_api_keys()
 
 
-def set_app_agents(agents):
-    _initialize_session_state()
-    st.session_state.agents = agents
-    st.session_state.current_agent_name = list(st.session_state.agents.keys())[0]
+def set_app_agents(agents_func):
+    # _initialize_session_state()
+    if "agents" not in st.session_state:
+        agents = agents_func()
+        st.session_state.agents = agents
+        st.session_state.current_agent_name = list(st.session_state.agents.keys())[0]
 
-    for agent in st.session_state.agents.values():
-        if "conversation_started" not in agent:
-            agent["conversation_started"] = False
-        if "messages" not in agent:
-            agent["messages"] = []
+        for agent in st.session_state.agents.values():
+            if "conversation_started" not in agent:
+                agent["conversation_started"] = False
+            if "messages" not in agent:
+                agent["messages"] = []
 
 
 def serve_app():
-    _initialize_session_state()
+    # _initialize_session_state()
+    assert "agents" in st.session_state, "No agents have been set. Use set_app_agents() to set agents prior to serve_app()"
     _main()
 
+
+
+
+# Initialize session states
+def _initialize_session_state():
+    if "logger" not in st.session_state:
+        st.session_state.logger = logging.getLogger(__name__)
+        st.session_state.logger.handlers = []
+        st.session_state.logger.setLevel(logging.INFO)
+        st.session_state.logger.addHandler(logging.StreamHandler())
+
+    st.session_state.setdefault("user_api_key", "")
+    st.session_state.setdefault("default_api_key", None)  # Store the original API key
+    st.session_state.setdefault("show_function_calls", False)
+    st.session_state.setdefault("ui_disabled", False)
+    st.session_state.setdefault("lock_widgets", False)
+
+    # st.session_state.setdefault("agents" , {"Default Agent": 
+    #                                             {"agent": UtilityAgent("Default Agent"),
+    #                                              "greeting": "Hello, I'm the default agent. I can't do much other than talk. Oh! I can tell you the current time if you like.",
+    #                                              "avatar": "🤖",
+    #                                              "user_avatar": "👤"}
+    #                                        })
+
+    # st.session_state.setdefault("current_agent_name", "Default Agent")
+
+    # for agent in st.session_state.agents.values():
+    #     if "conversation_started" not in agent:
+    #         agent["conversation_started"] = False
+    #     if "messages" not in agent:
+    #         agent["messages"] = []
 
 # Update agents to use the current API key
 # if the user has provided one, use that
@@ -191,34 +226,41 @@ def _main():
         st.chat_input(placeholder="Enter an API key to begin chatting.", disabled=True)
 
 
-# Initialize session states
-def _initialize_session_state():
-    if "logger" not in st.session_state:
-        st.session_state.logger = logging.getLogger(__name__)
-        st.session_state.logger.handlers = []
-        st.session_state.logger.setLevel(logging.INFO)
-        st.session_state.logger.addHandler(logging.StreamHandler())
 
-    st.session_state.setdefault("user_api_key", "")
-    st.session_state.setdefault("default_api_key", None)  # Store the original API key
-    st.session_state.setdefault("show_function_calls", False)
-    st.session_state.setdefault("ui_disabled", False)
-    st.session_state.setdefault("lock_widgets", False)
 
-    st.session_state.setdefault("agents" , {"Default Agent": 
-                                                {"agent": UtilityAgent("Default Agent"),
-                                                 "greeting": "Hello, I'm the default agent. I can't do much other than talk. Oh! I can tell you the current time if you like.",
-                                                 "avatar": "🤖",
-                                                 "user_avatar": "👤"}
-                                           })
+def _ensure_streamlit_config():
+    # Ensure .streamlit directory exists
+    config_dir = pathlib.Path('.streamlit')
+    config_dir.mkdir(exist_ok=True)
 
-    st.session_state.setdefault("current_agent_name", "Default Agent")
+    # Path to the config.toml
+    config_path = config_dir / 'config.toml'
 
-    for agent in st.session_state.agents.values():
-        if "conversation_started" not in agent:
-            agent["conversation_started"] = False
-        if "messages" not in agent:
-            agent["messages"] = []
+    # Default values
+    default_config = {
+        'theme': {
+            'base': 'light',
+            'primaryColor': '#4bbdff'
+        }
+    }
+
+    # If config.toml doesn't exist, create it with default values
+    if not config_path.exists():
+        with open(config_path, 'w') as config_file:
+            toml.dump(default_config, config_file)
+    else:
+        # If it exists, ensure it has the theme settings
+        with open(config_path, 'r') as config_file:
+            config = toml.load(config_file)
+
+        config['theme'] = default_config['theme']
+
+        with open(config_path, 'w') as config_file:
+            toml.dump(config, config_file)
+
+
+
+
 
 # # Main script execution
 # if __name__ == "__main__":
@@ -380,37 +422,6 @@ def _initialize_session_state():
 #         return bool(st.session_state.user_api_key) or bool(st.session_state.default_api_key)
 
 
-
-
-#     def _ensure_streamlit_config(self):
-#         # Ensure .streamlit directory exists
-#         config_dir = pathlib.Path('.streamlit')
-#         config_dir.mkdir(exist_ok=True)
-
-#         # Path to the config.toml
-#         config_path = config_dir / 'config.toml'
-
-#         # Default values
-#         default_config = {
-#             'theme': {
-#                 'base': 'light',
-#                 'primaryColor': '#4bbdff'
-#             }
-#         }
-
-#         # If config.toml doesn't exist, create it with default values
-#         if not config_path.exists():
-#             with open(config_path, 'w') as config_file:
-#                 toml.dump(default_config, config_file)
-#         else:
-#             # If it exists, ensure it has the theme settings
-#             with open(config_path, 'r') as config_file:
-#                 config = toml.load(config_file)
-
-#             config['theme'] = default_config['theme']
-
-#             with open(config_path, 'w') as config_file:
-#                 toml.dump(config, config_file)
 
 
 

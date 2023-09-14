@@ -65,7 +65,7 @@ pypi-publish:
 ##### Webapp #####
 
 example-streamlit:
-	poetry run streamlit run examples/streamlit_server.py
+	poetry run streamlit run examples/streamlit_app.py
 
 
 ##### Bash Agent #####
