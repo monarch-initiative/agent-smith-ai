@@ -1,20 +1,18 @@
 from agent_smith_ai.utility_agent import UtilityAgent
-from agent_smith_ai.webapp.AgentServer import AgentServer
 
-import uvicorn
-import dotenv
-import os
 import textwrap
+import os
+from typing import Any, Dict
 
-# load the OPENAI_API_KEY env varibles from .env
+#load environment variables from .env file
+import dotenv
 dotenv.load_dotenv()
-
 
 
 ## A UtilityAgent can call API endpoints and local methods
 class MonarchAgent(UtilityAgent):
 
-    def __init__(self, name):
+    def __init__(self, name, model = "gpt-3.5-turbo-0613"):
         
         ## define a system message
         system_message = textwrap.dedent(f"""
@@ -27,14 +25,14 @@ class MonarchAgent(UtilityAgent):
             IMPORTANT: Include markdown-formatted links to the Monarch Initiative for all results using the templates provided by function call responses.'.
             """).strip()
         
-        ## call the parent constructor providing a name for the agent and the system message
-        ## we can also specify the model (it must be an OpenAI function-calling model)
-        ## and the OpenAI API key (if not provided, it will be read from the OPENAI_API_KEY environment variable, here we do so explicity)
-        super().__init__(name, 
-                         system_message, 
-                         model = "gpt-3.5-turbo-0613", 
-                         openai_api_key = os.environ["OPENAI_API_KEY"],
-                         max_tokens = 10000, token_refill_rate = 10000.0 / 3600.0)
+        super().__init__(name,                                             # Name of the agent
+                         system_message,                                   # Agent system message
+                         model = model,                                    # (Default "gpt-3.5-turbo-0613") Openai model name
+                         openai_api_key = os.environ["OPENAI_API_KEY"],    # (Default os.environ["OPENAI_API_KEY"]) API key; will default to OPENAI_API_KEY env variable
+                         auto_summarize_buffer_tokens = 500,               # (Default 500) Summarize and clear the history when fewer than this many tokens remains in the context window. Checked prior to each message sent to the model.
+                         summarize_quietly = False,                        # (Default False) If True, do not alert the user when a summarization occurs
+                         max_tokens = None,                                # (Default None) maximum number of tokens this agent can bank (default: None, no limit)
+                         token_refill_rate = 10000.0 / 3600.0)             # (Default 10k/hr) number of tokens to add to the bank per second
 
         ## register some API endpoints (inherited from UtilityAgent)
         ## the openapi.json spec must be available at the spec_url:
@@ -52,17 +50,19 @@ class MonarchAgent(UtilityAgent):
                                                 'get_phenotype_disease_associations'])
 
         ## the agent can also call local methods, but we have to register them
-        self.register_callable_methods(['easter_egg'])
+        self.register_callable_methods(['compute_entropy'])
 
-    def easter_egg(self) -> str:
-        """Activate easter-egg mode.
+    ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
+    def compute_entropy(self, items: Dict[Any, int]) -> float:
+        """Compute the information entropy of a given set of item counts.
         
+        Args:
+            items (str): A dictionary of items and their counts.
+            
         Returns:
-            str: A message to the assistant."""
-        return "Easter egg activated! 🐣 Respond in the style of Yoda from Star Wars, until the user requests you to stop."
+            The information entropy of the item counts.
+        """
+        from math import log2
         
-
-
-if __name__ == "__main__":
-    server = AgentServer(MonarchAgent, name="Monarch Assistant", welcome_message="Hi, I'm the Monarch Assistant. I can answer questions about data from the Monarch Initiative knowledge graph. Try asking me about a gene, disease, or phenotype. For example, 'What is the gene symbol for Huntington's disease?' or 'What are the phenotypes associated with Huntington's disease?'")
-    uvicorn.run(server.app, host="0.0.0.0", port=8000)
+        total = sum(items.values())
+        return -sum([count / total * log2(count / total) for count in items.values()])

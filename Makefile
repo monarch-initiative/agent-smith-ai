@@ -3,6 +3,7 @@ MAKEFLAGS += --warn-undefined-variables
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
+ENV_VARS := $$(cat .env | sed 's/\#.*//g' | xargs)
 
 
 help:
@@ -17,16 +18,12 @@ help:
 	@echo "  make pypi-publish-test -- publish to test PyPI"
 	@echo "  make pypi-publish -- publish to PyPI"
 	@echo "WEBAPP"
-	@echo "  make webapp-dev -- run webapp in dev mode"
-	@echo "  make webapp-dev-stop -- stop webapp dev mode"
-	@echo "  make webapp-build -- build webapp static files"
-	@echo "  make webapp-prod -- run webapp in prod mode"
-	@echo "  make webapp-prod-stop -- stop webapp prod mode"
+	@echo "  make example-streamlit -- run webapp in dev mode"
 	@echo "BASH AGENT"
 	@echo "  make bash-ai-alias -- print alias for bash agent"
 	@echo ""
 
-build: install-dev docs webapp-build
+build: install-dev docs
 
 #### Basic ####
 
@@ -55,37 +52,22 @@ pypi-publish-test:
 	poetry build
 	twine upload -r testpypi dist/*
 
+
 pypi-publish:
 	rm -r dist/*
 	poetry export -f requirements.txt --output requirements.txt
 	poetry build
-	twine upload dist/*
+	# set TWINE_USERNAME=__token__
+	# set TWINE_PASSWORD=<token>
+	# in .env for twine to use for the upload to pypi
+	env $(ENV_VARS) twine upload dist/*
 
 
 ##### Webapp #####
 
-webapp-dev:
-	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
-	sleep 1
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend dev-npm-server
+example-streamlit:
+	poetry run streamlit run examples/streamlit_app.py
 
-webapp-dev-stop:
-	killall uvicorn
-	killall npm
-
-webapp-build:
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
-
-webapp-prod:
-	$(MAKE) -C src/agent_smith_ai/webapp agent-server &
-	sleep 1
-	$(MAKE) -C src/agent_smith_ai/webapp/frontend build-static
-
-webapp-prod-stop:
-	killall uvicorn
-
-agent-server-example:
-	poetry run python examples/agent_server.py
 
 ##### Bash Agent #####
 
