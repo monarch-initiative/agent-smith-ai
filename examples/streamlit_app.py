@@ -3,9 +3,17 @@ import agent_smith_ai.streamlit_server as sv
 import dotenv
 import os
 
+### You may wish to create a .streamlit/config.toml file in the same directory as this script
+### with contents to adjust the theme:
+# [theme]
+# base = "light"
+# primaryColor = "#4bbdff"
+
+
 
 # initialize the application and set some page settings
 # parameters here are passed to streamlit.set_page_config, see more at https://docs.streamlit.io/library/api-reference/utilities/st.set_page_config
+# this function must be run first
 sv.initialize_app_config(
     page_title = "Monarch Assistant",
     page_icon = "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
@@ -16,7 +24,7 @@ sv.initialize_app_config(
         }
 )
 
-# define a function that returns a dictionary of agents
+# define a function that returns a dictionary of agents to serve
 def get_agents():
     # add some useful agents
     return {

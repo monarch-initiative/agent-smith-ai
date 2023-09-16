@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "agent_smith_ai"
-version = "0.13.0"
+version = "0.14.0"
 description = "agent-smith-ai"
 authors = ["Shawn T. O'Neil <shawn@tislab.org>"]
 license = "MIT"

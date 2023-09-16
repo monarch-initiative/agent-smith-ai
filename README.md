@@ -156,7 +156,7 @@ These are not complete and may be moved, but the following are currently include
 
 **agent_smith_ai.CLIAgent**: A basic command-line agent with some formatting and markdown rendering provided by `rich`. May be inhereted in the same way as `UtilityAgent` for added functionality.
 
-**agent_smith_ai.webapp.AgentServer.AgentServer**: Serves UtilityAgent-based agents to a React-based frontend from a FastAPI backend. Client-side session IDs are used in conjunction with agent's token rate limiting to limit the number of messages a single user can send, but client-side protections are easy to bypass without authentication. **WARNING: this early code is not secure for production use!**
+**agent_smith_ai.streamlit_server**: Serves UtilityAgent-based agents to a Streamlit-based frontend. See `examples/streamlit_app.py` for usage.
 
 **agent_smith_ai/bash_agent/main.py**: Early version of a command-line-based AI assistant that can write and execute (after confirmation) complex commands.
 
@@ -630,6 +630,7 @@ User: Ok, show the function calls again, and tell me more about the CFTR gene.
 
 ## Changelog
 
+* 0.14.0: Added streamlit-based UI component
 * 0.13.0: Added ability to clear history 
 * 0.12.0: Added toxicity check for user messages with OpenAI Moderation endpoint
 * 0.11.2: Added ability to swap out OpenAI API key for an active agent
