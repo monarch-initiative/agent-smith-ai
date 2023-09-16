@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Union, Literal, get_args, get_origin, Genera
 # Third party imports
 from docstring_parser import parse
 import openai
+import litellm
 import tiktoken
 
 # Local application imports
@@ -157,14 +158,14 @@ class UtilityAgent:
         if self.function_schema_tokens is not None and not force_update:
             return self.function_schema_tokens
 
-        response_raw_w_functions = openai.ChatCompletion.create(
+        response_raw_w_functions = litellm.completion(
                   model=self.model,
                   temperature = 0,
                   messages = [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'hi'}],
                   functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
                   function_call = "auto")
        
-        response_raw_no_functions = openai.ChatCompletion.create(
+        response_raw_no_functions = litellm.completion(
                   model=self.model,
                   temperature = 0,
                   messages = [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'hi'}])
@@ -237,7 +238,7 @@ class UtilityAgent:
                 return
 
         try:
-            response_raw = openai.ChatCompletion.create(
+            response_raw = litellm.completion(
                       model=self.model,
                       temperature = 0,
                       messages = self._reserialize_chat(self.history),
@@ -289,7 +290,7 @@ class UtilityAgent:
         yield from self._summarize_if_necessary()
 
         try:
-            response_raw = openai.ChatCompletion.create(
+            response_raw = litellm.completion(
                       model=self.model,
                       temperature = 0,
                       messages = self._reserialize_chat(self.history),
@@ -476,7 +477,7 @@ class UtilityAgent:
         # the model may want to make *another* function call, so it is processed recursively using the logic above
         # (TODO? set a maximum recursive depth to avoid infinite-loop behavior)
         try:
-            reponse_raw = openai.ChatCompletion.create(
+            reponse_raw = litellm.completion(
                               model=self.model,
                               temperature = 0,
                               messages = self._reserialize_chat(self.history),
