@@ -117,10 +117,10 @@ Messages are `pydantic` models, so `message.model_dump()` converts each message 
 agent = MonarchAgent("Monarch Assistant")
 question = "What genes are associated with Cystic Fibrosis?"
 
-## agent.new_chat(question) may result in a series of Message objects (which may consist of a series of function-call messages,
+## agent.chat(question) may result in a series of Message objects (which may consist of a series of function-call messages,
 ## function-call responses, and other messages)
 ## by default, the system message and initial prompt question are not included in the output, but can be
-for message in agent.new_chat(question, yield_system_message = True, yield_prompt_message = True, author = "User"):
+for message in agent.chat(question, yield_system_message = True, yield_prompt_message = True, author = "User"):
     ## each Message object as the following attributes and defaults:
         # role: str                                         // required, either "user", "assistant", or "function" (as used by OpenAI API)
         # author: str = None                                // the name of the author of the message
@@ -136,12 +136,12 @@ for message in agent.new_chat(question, yield_system_message = True, yield_promp
     print("\n\n", message.model_dump())
 ```
 
-Once a chat has been initialized this way, it can be continued with `.continue_chat()` which operates in a similar way:
+Once a chat has been initialized this way, it can be continued with further calls to `.chat()`:
 
 ```python
 ## agent.continue_chat(question) works just like .new_chat(), but doesn't allow including the system message
 question_followup = "What other diseases are associated with the first one you listed?"
-for message in agent.continue_chat(question_followup, yield_prompt_message = True, author = "User"):
+for message in agent.chat(question_followup, yield_prompt_message = True, author = "User"):
     print("\n\n", message.model_dump())
 
 question_followup = "What is the entropy of a standard tile set in Scrabble?"
@@ -154,9 +154,9 @@ for message in agent.continue_chat(question_followup, yield_prompt_message = Tru
 
 These are not complete and may be moved, but the following are currently included here:
 
-**agent_smith_ai.CLIAgent**: A basic command-line agent with some formatting and markdown rendering provided by `rich`. May be inhereted in the same way as `UtilityAgent` for added functionality.
-
 **agent_smith_ai.streamlit_server**: Serves UtilityAgent-based agents to a Streamlit-based frontend. See `examples/streamlit_app.py` for usage.
+
+**agent_smith_ai.CLIAgent**: A basic command-line agent with some formatting and markdown rendering provided by `rich`. May be inhereted in the same way as `UtilityAgent` for added functionality.
 
 **agent_smith_ai/bash_agent/main.py**: Early version of a command-line-based AI assistant that can write and execute (after confirmation) complex commands.
 

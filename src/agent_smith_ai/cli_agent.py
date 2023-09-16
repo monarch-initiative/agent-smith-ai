@@ -105,13 +105,13 @@ class CLIAgent(UtilityAgent):
         """Starts the chat UI, prompting the user for an initial message."""
         user_input = self.prompt_session.prompt([('class:prompt', 'User: ')])
 
-        for message in self.new_chat(user_input):
+        for message in self.chat(user_input):
             self._log_message(message)
 
         while user_input != "exit":
             user_input = self.prompt_session.prompt([('class:prompt', 'User: ')])
 
-            for message in self.continue_chat(user_input):
+            for message in self.chat(user_input):
                 self._log_message(message)
 
 
