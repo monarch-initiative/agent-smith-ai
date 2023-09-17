@@ -14,7 +14,7 @@ class ExampleAgent(UtilityAgent):
 
 
         self.register_api("monarch", "https://oai-monarch-plugin.monarchinitiative.org/openapi.json", "https://oai-monarch-plugin.monarchinitiative.org")
-        self.register_callable_methods(["sing_a_song", "run_timer"])
+        self.register_callable_functions({"sing_a_song": self.sing_a_song, "run_timer": self.run_timer})
 
 
     def sing_a_song(self):
@@ -39,10 +39,10 @@ class ExampleAgent(UtilityAgent):
         import time 
         
         agent = UtilityAgent()
-        yield from agent.new_chat("Please report the current time.")
+        yield from agent.chat("Please report the current time.")
         for i in range(num_seconds):
             time.sleep(1)
-            yield agent.continue_chat("Please report the current time again.")
+            yield agent.chat("Please report the current time again.")
 
 
 def test_example_agent():
@@ -50,14 +50,16 @@ def test_example_agent():
 
     assert agent.name is not None
     assert agent.api_set is not None
-    assert agent.history is not None
 
-    for message in agent.new_chat("Hey!"):
+    for message in agent.chat("Hey!"):
         print("\n\n\nMESSAGE: ", message.dict())
         assert message.role is not None
         assert message.content is not None
 
-    for message in agent.continue_chat("Can you run me a 3 second timer?"):
+    # history is none until the agent has been used
+    assert agent.history is not None
+
+    for message in agent.chat("Can you run me a 3 second timer?"):
         print("\n\n\nMESSAGE: ", message)
         assert message.role is not None        
 
@@ -65,11 +67,11 @@ def test_agent_token_limiter():
     agent = UtilityAgent(max_tokens = 10, token_refill_rate = 1)
 
     # there result should be one message yielded
-    messages = agent.new_chat("Hi")
+    messages = agent.chat("Hi")
     assert len(list(messages)) == 1
 
     print(agent.token_bucket.tokens)
-    messages = list(agent.continue_chat("Hi"))
+    messages = list(agent.chat("Hi"))
     # this should result in an error because the agent has no tokens left
     # the author will be "System"
     assert len(messages) == 1
