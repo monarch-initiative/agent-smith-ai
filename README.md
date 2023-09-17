@@ -2,13 +2,21 @@
 
 Agent smith makes it easy to instantiate AI agents that can safely and easily call APIs and locally defined functions to interact with the world. It is currently designed to use OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling) and thus requires an OpenAI API key.
 
+Current features:
+
+* Auto-summarization of conversations approaching the model's context window size.
+* User messages are checked with OpenAI's moderations endpoint by default and rejected if toxic.
+* Messages, including function call and result messages, are yielded to the caller in a stream.
+* An optional token-bucket allows built-in rate-limiting.
+* A basic, easy-to-deploy streamlit-based UI.
+
+
 <!-- <img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" style="align: center;" />  -->
 
 
 ## Basic Usage
 
-Primary functionality is provided by a `agent_smith_ai.utility_agent.UtilityAgent` class, which yields `Message` objects in response to user questions. They also manage internal state chat, including the system prompt, chat history, token usage, and auto-summarization when the conversation length nears the context length. Finally, using OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling), they can register endpoints of REST API's, and locally defined
-methods as callable functions.
+Primary functionality is provided by a `agent_smith_ai.utility_agent.UtilityAgent` class, which yields `Message` objects in response to user questions. They also manage internal state chat, including the system prompt, chat history, token usage, and auto-summarization when the conversation length nears the context length. Finally, using OpenAI's [function-calling models](https://platform.openai.com/docs/guides/gpt/function-calling), they can register endpoints of REST API's, and locally defined methods and functions as callable functions.
 
 Here's some code from the basic example in `examples/monarch_basic.py`, which makes calls to a [Monarch Initiative](https://monarchinitiative.org) API. We start by using `dotenv` to read a `.env` file defining our `OPENAI_API_KEY` environment variable 
 if present (we just need some way to access the key). We inherit from the `UtilityAgent` class, defining a name and system
@@ -81,7 +89,7 @@ parsable by [docstring-parser](https://pypi.org/project/docstring-parser/).
 
 ```python
         ## the agent can also call local methods, but we have to register them
-        self.register_callable_methods(['compute_entropy'])
+        self.register_callable_functions({'compute_entropy': self.compute_entropy})
 
     ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
     def compute_entropy(self, items: Dict[Any, int]) -> float:
@@ -139,7 +147,6 @@ for message in agent.chat(question, yield_system_message = True, yield_prompt_me
 Once a chat has been initialized this way, it can be continued with further calls to `.chat()`:
 
 ```python
-## agent.continue_chat(question) works just like .new_chat(), but doesn't allow including the system message
 question_followup = "What other diseases are associated with the first one you listed?"
 for message in agent.chat(question_followup, yield_prompt_message = True, author = "User"):
     print("\n\n", message.model_dump())
@@ -149,12 +156,94 @@ for message in agent.continue_chat(question_followup, yield_prompt_message = Tru
     print("\n\n", message.model_dump())
 ```
 
+Other functionality provided by agents includes `.set_api_key()` for changing an agent's API-key mid-conversation, `.clear_history()` for 
+clearing an agent's conversation history (but not it's token usage), and `.compute_token_cost()` to estimate the total token cost of a potential
+message, including the conversation history and function definitions. The basic `UtilityAgent` comes with two callable functions by default, `time()`
+and `help()`, which report the current date and time to the model, and a summary of callable functions and API endpoints, respectively.
+
+
+## Streamlit-based UI
+
+This package includes a basic, opinionated web-UI for serving agents based on streamlit, `examples/streamlit_app.py` provides an example. We assume
+an agent class such as `MonarchAgent` in `examples/monarch_agent.py` has been defined; this example is defined to accept the model name (e.g.
+`gpt-3.5-turbo-0613`) during the agent creation.
+
+```python
+from monarch_agent import MonarchAgent
+import agent_smith_ai.streamlit_server as sv
+import os
+import dotenv
+dotenv.load_dotenv()          # load env variables defined in .env file (if any)
+```
+
+Next we initialize the application, specifying the page title and icon and other application features. Arguments are passed
+to streamlit's [`set_page_config()`](https://docs.streamlit.io/library/api-reference/utilities/st.set_page_config), and calling this once before other functions below is required.
+
+```python
+sv.initialize_app_config(
+    page_title = "Monarch Assistant",
+    page_icon = "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
+    initial_sidebar_state = "collapsed", # or "expanded"
+    menu_items = {
+            "Get Help": "https://github.com/monarch-initiative/agent-smith-ai/issues",
+            "Report a Bug": "https://github.com/monarch-initiative/agent-smith-ai/issues",
+            "About": "Agent Smith (AI) is a framework for developing tool-using AI-based chatbots.",
+        }
+)
+```
+
+Next we define some agents. In order to make this performance with streamlit, we define a function that will return a dictionary
+of agents when called, and then pass this function to `sv.set_app_agents()` function. The agent dictionary keys are used to define
+agent names, with values containing the agent object itself in `"agent"`, a `"greeting"` that is shown to the user by the agent when first
+loaded (but that is not part of the agent's conversation history), and avatars for both the user and the agent, which can be characters (including
+unicode/emoji) or URLs to images.
+
+```python
+def get_agents():
+    return {
+        "Monarch Assistant": {
+            "agent": MonarchAgent("Monarch Assistant", model="gpt-3.5-turbo-16k-0613"),
+            "greeting": "Hello, I'm the Monarch Assistant.",
+            "avatar": "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
+            "user_avatar": "👤",
+        },
+        "Monarch Assistant (GPT-4)": {
+            "agent": MonarchAgent("Monarch Assistant (GPT-4)", model="gpt-4-0613"),
+            "greeting": "Hello, I'm the Monarch Assistant, based on GPT-4.",
+            "avatar": "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
+            "user_avatar": "👤",
+        }
+    }
+
+# tell the app to use that function to create agents when needed
+sv.set_app_agents(get_agents)
+```
+
+We can set a default OpenAI API key to use. If one is not provided this way, the user will need to enter one in the sidebar to chat.
+If one is set this way, the user can still enter their own key if they like, which will override the default key.
+
+```python
+sv.set_app_default_api_key(os.environ["OPENAI_API_KEY"])
+```
+
+Lasly we start the app.
+
+```python
+sv.serve_app()
+```
+
+To run the app, install `streamlit` and run `streamlit run examples/streamlit_app.py`. Messages are logged as they are generated and associated with session IDs for conversation tracking.
+
+**A note on streamlit**: streamlit is a UI framework designed to make it easy to develop and deploy web applications. Its execution model
+involves re-running the entire python script every time the UI changes or an action is taken, using deliberate state tracking and making heavy use of caching for efficiency. Beware of this if attempting to do extra work as part of the main application.
+
+It is also easy to publish your streamit app to their [community cloud](https://docs.streamlit.io/streamlit-community-cloud/deploy-your-app). 
+Note that at this time the application does not handle user authentication or rate-limiting of any kind.
+
 
 ## Additional Experiments and Examples
 
 These are not complete and may be moved, but the following are currently included here:
-
-**agent_smith_ai.streamlit_server**: Serves UtilityAgent-based agents to a Streamlit-based frontend. See `examples/streamlit_app.py` for usage.
 
 **agent_smith_ai.CLIAgent**: A basic command-line agent with some formatting and markdown rendering provided by `rich`. May be inhereted in the same way as `UtilityAgent` for added functionality.
 
