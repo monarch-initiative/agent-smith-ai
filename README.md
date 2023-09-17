@@ -719,6 +719,9 @@ User: Ok, show the function calls again, and tell me more about the CFTR gene.
 
 ## Changelog
 
+* 1.0.0:
+  * Replace .new_chat() and .continue_chat() with just chat()
+  * Update function spec to provide actual Callables, not just method nodes
 * 0.14.0: Added streamlit-based UI component
 * 0.13.0: Added ability to clear history 
 * 0.12.0: Added toxicity check for user messages with OpenAI Moderation endpoint
