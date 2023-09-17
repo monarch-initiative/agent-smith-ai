@@ -57,16 +57,28 @@ class UtilityAgent:
         self.summarize_quietly = summarize_quietly
 
         self.system_message = system_message
-        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
+        self.history = None
     
         self.api_set = APIWrapperSet([])
-        self.callable_methods = []
+        self.callable_functions = {}
 
         self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached; being lazy speeds up agent initialization
-        self.register_callable_methods(["time", "help"])
+        self.register_callable_functions({"time": self.time, "help": self.help})
 
         self.token_bucket = TokenBucket(tokens = max_tokens, refill_rate = token_refill_rate)
         self.check_toxicity = check_toxicity
+
+
+    def set_api_key(self, key: str) -> None:
+        """Sets the OpenAI API key for the agent.
+
+        Args:
+            key (str): The OpenAI API key to use."""
+        openai.api_key = key
+        # the openai module caches the key, but we also need to set it in the environment
+        # as this overrides the cached value
+        os.environ["OPENAI_API_KEY"] = key
+
 
     def register_api(self, name: str, spec_url: str, base_url: str, callable_endpoints: List[str] = []) -> None:
         """Registers an API with the agent. The agent will be able to call the API's endpoints.
@@ -79,18 +91,118 @@ class UtilityAgent:
         """
         self.api_set.add_api(name, spec_url, base_url, callable_endpoints)
 
-    def register_callable_methods(self, method_names: List[str]) -> None:
+
+    def register_callable_functions(self, functions: Dict[str, Callable]) -> None:
         """Registers methods with the agent. The agent will be able to call these methods.
         
         Args:
             method_names (List[str]): A list of method names that the agent can call."""
-        for method_name in method_names:
-            self.callable_methods.append(method_name)
+        for func_name in functions.keys():
+            func = functions[func_name]
+            self.callable_functions[func_name] = func
+
+
+
+    def chat(self, user_message: str, yield_system_message = False, yield_prompt_message = False, author = "User") -> Generator[Message, None, None]:
+        """Starts a new chat or continues an existing chat. If starting a new chat, you can ask to have the system message yielded to the stream first.
+        
+        Args:
+            user_message (str): The user's first message.
+            yield_system_message (bool, optional): If true, yield the system message in the output stream as well. Defaults to False. Only applicable with a new or recently cleared chat.
+            yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
+            author (str, optional): The name of the user. Defaults to "User".
+            
+        Yields:
+            One or more messages from the agent."""
+        
+        if self.history is None:
+            self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
+
+            if yield_system_message:
+                yield self.history.messages[0]
+
+        user_message = Message(role = "user", content = user_message, author = author, intended_recipient = self.name)
+
+        if yield_prompt_message:
+            yield user_message
+
+        self.token_bucket.refill()
+        needed_tokens = self.compute_token_cost(user_message.content)
+        sufficient_budget = self.token_bucket.consume(needed_tokens)
+        if not sufficient_budget:
+            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = author)
+            return
+
+        self.history.messages.append(user_message)
+        
+        if self.check_toxicity:
+            try:
+                toxicity = openai.Moderation.create(input = user_message.content)
+                if toxicity['results'][0]['flagged']:
+                    yield Message(role = "assistant", content = f"I'm sorry, your message appears to contain inappropriate content. Please keep it civil.", author = "System", intended_recipient = author)
+                    return
+            except Exception as e:
+                yield Message(role = "assistant", content = f"Error in toxicity check: {str(e)}", author = "System", intended_recipient = author)
+                return
+
+        yield from self._summarize_if_necessary()
+
+        try:
+            response_raw = openai.ChatCompletion.create(
+                      model=self.model,
+                      temperature = 0,
+                      messages = self._reserialize_history(),
+                      functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
+                      function_call = "auto")
+
+            for message in self._process_model_response(response_raw, intended_recipient = author):
+                yield message
+                self.history.messages.append(message)
+                yield from self._summarize_if_necessary()
+        except Exception as e:
+            yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
 
 
     def clear_history(self):
         """Clears the agent's history as though it were a new agent, but leaves the token bucket, model, and other information alone."""
-        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
+        self.history = None
+
+
+    def compute_token_cost(self, proposed_message: str) -> int:
+        """Computes the total token count of the current history plus, plus function definitions, plus the proposed message. Can thus act
+        as a proxy for the cost of the proposed message at the current point in the conversation, and to determine whether a conversation
+        summary is necessary.
+        
+        Args:
+            proposed_message (str): The proposed message.
+            
+        Returns:
+            int: The total token count of the current history plus, plus function definitions, plus the proposed message."""
+        cost = self._count_history_tokens() + self._count_function_schema_tokens() + _num_tokens_from_messages([{"role": "user", "content": proposed_message}])
+        return cost
+    
+
+    #################### 
+    ## Methods that are callable by all agents
+    ####################
+    
+    def help(self) -> Dict[str, Any]:
+        """Returns information about this agent, including a list of callable methods and functions."""
+        return {"callable_methods": self._get_method_schemas() + self.api_set.get_function_schemas(), 
+                "system_prompt": self.system_message,
+                "name": self.name,
+                "chat_history_length": len(self.history.messages),
+                "model": self.model}
+
+
+    def time(self) -> str:
+        """Get the current date and time.
+
+        Returns: MM/DD/YY HH:MM formatted string.
+        """
+        now = datetime.now()
+        formatted_now = now.strftime("%m/%d/%y %H:%M")
+        return formatted_now
 
 
     def _get_method_schemas(self) -> List[Dict[str, Any]]:
@@ -98,11 +210,12 @@ class UtilityAgent:
         
         Returns:
             A list of schemas for the agent's callable methods."""
-        methods = inspect.getmembers(self, predicate=inspect.ismethod)
-        return [_generate_schema(m[1]) for m in methods if m[0] in self.callable_methods]
+        # methods = inspect.getmembers(self, predicate=inspect.ismethod)
+        # return [_generate_schema(m[1]) for m in methods if m[0] in self.callable_functions]
 
+        return [_generate_schema(self.callable_functions[m]) for m in self.callable_functions.keys()]
 
-    def _call_method(self, method_name: str, params: dict) -> Generator[Message, None, None]:
+    def _call_function(self, func_name: str, params: dict) -> Generator[Message, None, None]:
         """Calls one of the agent's callable methods.
         
         Args:
@@ -111,25 +224,16 @@ class UtilityAgent:
             
         Yields:
             One or more messages containing the result of the method call."""
-        method = getattr(self, method_name, None)
-        if method is not None and callable(method):
-            result = method(**params)
+        func = self.callable_functions.get(func_name, None)
+        if func is not None and callable(func):
+            result = func(**params)
             if inspect.isgenerator(result):
                 yield from result
             else:
                 yield result
         else:
-            raise ValueError(f"No such method: {method_name}")
+            raise ValueError(f"No such function: {func_name}")
 
-    def set_api_key(self, key: str) -> None:
-        """Sets the OpenAI API key for the agent.
-
-        Args:
-            key (str): The OpenAI API key to use."""
-        openai.api_key = key
-        # the openai module caches the key, but we also need to set it in the environment
-        # as this overrides the cached value
-        os.environ["OPENAI_API_KEY"] = key
 
     def _count_history_tokens(self) -> int:
         """
@@ -138,7 +242,7 @@ class UtilityAgent:
         Returns: 
             The number of tokens in self.history.
         """
-        history_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model)
+        history_tokens = _num_tokens_from_messages(self._reserialize_history(), model = self.model)
         return history_tokens
 
 
@@ -175,149 +279,7 @@ class UtilityAgent:
         return diff
 
 
-    def help(self) -> Dict[str, Any]:
-        """Returns information about this agent, including a list of callable methods and functions."""
-        return {"callable_methods": self._get_method_schemas() + self.api_set.get_function_schemas(), 
-                "system_prompt": self.system_message,
-                "name": self.name,
-                "chat_history_length": len(self.history.messages),
-                "model": self.model}
 
-    def time(self) -> str:
-        """Get the current date and time.
-
-        Returns: MM/DD/YY HH:MM formatted string.
-        """
-        now = datetime.now()
-        formatted_now = now.strftime("%m/%d/%y %H:%M")
-        return formatted_now
-
-
-
-    def new_chat(self, user_message: str, yield_system_message = False, yield_prompt_message = False, author = "User") -> Generator[Message, None, None]:
-        """Starts a new chat with the given system message and user message.
-        
-        Args:
-            user_message (str): The user's first message.
-            yield_system_message (bool, optional): If true, yield the system message in the output stream as well. Defaults to False.
-            yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
-            author (str, optional): The name of the user. Defaults to "User".
-            
-        Yields:
-            One or more messages from the agent."""
-        
-
-        self.history = Chat(messages = [Message(role = "system", content = self.system_message, author = "System", intended_recipient = self.name)])
-
-        if yield_system_message:
-            yield self.history.messages[0]
-
-        user_message = Message(role = "user", content = user_message, author = author, intended_recipient = self.name)
-
-        if yield_prompt_message:
-            yield user_message
-
-        self.token_bucket.refill()
-        needed_tokens = self.compute_token_cost(user_message.content)
-        sufficient_budget = self.token_bucket.consume(needed_tokens)
-        if not sufficient_budget:
-            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = author)
-            return
-
-        self.history.messages.append(user_message)
-        
-        if self.check_toxicity:
-            try:
-                toxicity = openai.Moderation.create(input = user_message.content)
-                if toxicity['results'][0]['flagged']:
-                    yield Message(role = "assistant", content = f"I'm sorry, your message appears to contain inappropriate content. Please keep it civil.", author = "System", intended_recipient = author)
-                    return
-            except Exception as e:
-                yield Message(role = "assistant", content = f"Error in toxicity check: {str(e)}", author = "System", intended_recipient = author)
-                return
-
-        try:
-            response_raw = openai.ChatCompletion.create(
-                      model=self.model,
-                      temperature = 0,
-                      messages = self._reserialize_chat(self.history),
-                      functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
-                      function_call = "auto")
-
-            for message in self._process_model_response(response_raw, intended_recipient = author):
-                yield message
-                self.history.messages.append(message)
-                yield from self._summarize_if_necessary()
-        except Exception as e:
-            yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
-
-
-
-    def continue_chat(self, new_user_message: str, yield_prompt_message = False, author = "User") -> Generator[Message, None, None]:
-        """Continues a chat with the given user message from the agent's history.
-        
-        Args:
-            new_user_message (str): The user's message.
-            yield_prompt_message (bool, optional): If true, yield the user's message in the output stream as well. Defaults to False.
-            author (str, optional): The name of the user. Defaults to "User"."""
-
-
-        new_user_message = Message(role = "user", content = new_user_message, author = author, intended_recipient = self.name)
-
-        if yield_prompt_message:
-            yield new_user_message
-            
-        self.token_bucket.refill()
-        needed_tokens = self.compute_token_cost(new_user_message.content)
-        sufficient_budget = self.token_bucket.consume(needed_tokens)
-        if not sufficient_budget:
-            yield Message(role = "assistant", content = f"Sorry, I'm out of tokens. Please try again later.", author = "System", intended_recipient = author)
-            return
-            
-        self.history.messages.append(new_user_message)
-
-        if self.check_toxicity:
-            try:
-                toxicity = openai.Moderation.create(input = new_user_message.content)
-                if toxicity['results'][0]['flagged']:
-                    yield Message(role = "assistant", content = f"I'm sorry, your message appears to contain inappropriate content. Please keep it civil.", author = "System", intended_recipient = author)
-                    return
-            except Exception as e:
-                yield Message(role = "assistant", content = f"Error in toxicity check: {str(e)}", author = "System", intended_recipient = author)
-                return
-
-        yield from self._summarize_if_necessary()
-
-        try:
-            response_raw = openai.ChatCompletion.create(
-                      model=self.model,
-                      temperature = 0,
-                      messages = self._reserialize_chat(self.history),
-                      functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
-                      function_call = "auto")
-
-            for message in self._process_model_response(response_raw, intended_recipient = author):
-                yield message
-
-                self.history.messages.append(message)
-                yield from self._summarize_if_necessary()
-        except Exception as e:
-            yield Message(role = "assistant", content = f"Error in attempted continue chat: {str(e)}", author = "System", intended_recipient = author)
-
-
-
-    def compute_token_cost(self, proposed_message: str) -> int:
-        """Computes the total token count of the current history plus, plus function definitions, plus the proposed message. Can thus act
-        as a proxy for the cost of the proposed message at the current point in the conversation, and to determine whether a conversation
-        summary is necessary.
-        
-        Args:
-            proposed_message (str): The proposed message.
-            
-        Returns:
-            int: The total token count of the current history plus, plus function definitions, plus the proposed message."""
-        cost = self._count_history_tokens() + self._count_function_schema_tokens() + _num_tokens_from_messages([{"role": "user", "content": proposed_message}])
-        return cost
 
     # this should only be called if the last message in the history is *not* the assistant or a function call:
     # - it's built to check after the incoming user message: if the total length of the chat plus the user message results in fewer than summary_buffer_tokens,
@@ -337,7 +299,7 @@ class UtilityAgent:
             new_user_message = self.history.messages[-1]
             author = new_user_message.author
 
-            num_tokens = _num_tokens_from_messages(self._reserialize_chat(self.history), model = self.model) + self._count_function_schema_tokens()
+            num_tokens = _num_tokens_from_messages(self._reserialize_history(), model = self.model) + self._count_function_schema_tokens()
             if num_tokens > _context_size(self.model) - self.auto_summarize:
                 if not self.summarize_quietly:
                     yield Message(role = "assistant", content = "I'm sorry, this conversation is getting too long for me to remember fully. I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
@@ -420,13 +382,13 @@ class UtilityAgent:
                                       is_function_call = False)
             
             ## if its not an API call, maybe it's one of the local callable methods
-            elif func_name in self.callable_methods:
+            elif func_name in self.callable_functions:
                 try:
                     # call_method is a generator, even if the method it's calling is not
                     # but if the method being called is a generator, it yields from the called generator
                     # so regardless, we are looping over results, checking each to see if the result is 
                     # already a message (as will happen in the case of a method that calls a sub-agent)
-                    func_result = self._call_method(func_name, func_arguments)
+                    func_result = self._call_function(func_name, func_arguments)
                     for potential_message in func_result:
                         # if it is a message already, just yield it to the stream
                         if isinstance(potential_message, Message):
@@ -479,7 +441,7 @@ class UtilityAgent:
             reponse_raw = openai.ChatCompletion.create(
                               model=self.model,
                               temperature = 0,
-                              messages = self._reserialize_chat(self.history),
+                              messages = self._reserialize_history(),
                               functions = self.api_set.get_function_schemas() + self._get_method_schemas(),
                               function_call = "auto")
         except Exception as e:
@@ -516,10 +478,13 @@ class UtilityAgent:
         return {"role": message.role, "content": message.content}
 
 
-    def _reserialize_chat(self, chat: Chat) -> List[Dict[str, Any]]:
+    def _reserialize_history(self) -> List[Dict[str, Any]]:
         """Reserializes a chat object (like self.history) into a list of dictionaries in the format used by the OpenAI API."""
         messages = []
-        for message in chat.messages:
+        if self.history is None:
+            return messages
+        
+        for message in self.history.messages:
             messages.append(self._reserialize_message(message))
         return messages
 

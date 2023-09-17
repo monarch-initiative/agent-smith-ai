@@ -1,7 +1,9 @@
 from monarch_agent import MonarchAgent
 import agent_smith_ai.streamlit_server as sv
-import dotenv
 import os
+import dotenv
+dotenv.load_dotenv()          # load env variables defined in .env file (if any)
+
 
 ### You may wish to create a .streamlit/config.toml file in the same directory as this script
 ### with contents to adjust the theme:
@@ -17,6 +19,7 @@ import os
 sv.initialize_app_config(
     page_title = "Monarch Assistant",
     page_icon = "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
+    initial_sidebar_state = "collapsed", # or "expanded"
     menu_items = {
             "Get Help": "https://github.com/monarch-initiative/agent-smith-ai/issues",
             "Report a Bug": "https://github.com/monarch-initiative/agent-smith-ai/issues",
@@ -26,7 +29,6 @@ sv.initialize_app_config(
 
 # define a function that returns a dictionary of agents to serve
 def get_agents():
-    # add some useful agents
     return {
         "Monarch Assistant": {
             "agent": MonarchAgent("Monarch Assistant", model="gpt-3.5-turbo-16k-0613"),
@@ -47,7 +49,6 @@ sv.set_app_agents(get_agents)
 
 # set a default API key from an env var; if not set the user will have to input one to chat
 #   - users can input their own in the UI to override the default as well
-dotenv.load_dotenv()          # load env variables defined in .env file (if any)
 sv.set_app_default_api_key(os.environ["OPENAI_API_KEY"])
 
 # start the app

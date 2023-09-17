@@ -38,7 +38,7 @@ class MonarchAgent(CLIAgent):
 
 
         # the agent can also call local methods, but we have to register them
-        self.register_callable_methods(['compute_entropy'])
+        self.register_callable_functions({'compute_entropy': self.compute_entropy})
 
         # let's also show the function calls and results behind the scenes as they happen (inherited from CLIAgent)
         self.show_function_calls()

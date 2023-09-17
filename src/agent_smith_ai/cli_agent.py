@@ -47,7 +47,9 @@ class CLIAgent(UtilityAgent):
             histfile = os.path.join(hist_path, agent_filename)
             self.prompt_session = PromptSession(history=FileHistory(histfile), style=style)
 
-        self.register_callable_methods(["show_function_calls", "hide_function_calls", "exit"])
+        self.register_callable_functions({"show_function_calls": self.show_function_calls, 
+                                          "hide_function_calls": self.hide_function_calls, 
+                                          "exit": self.exit})
 
         os.environ["SHOW_FUNCTION_CALLS"] = 'False'
 
@@ -105,13 +107,13 @@ class CLIAgent(UtilityAgent):
         """Starts the chat UI, prompting the user for an initial message."""
         user_input = self.prompt_session.prompt([('class:prompt', 'User: ')])
 
-        for message in self.new_chat(user_input):
+        for message in self.chat(user_input):
             self._log_message(message)
 
         while user_input != "exit":
             user_input = self.prompt_session.prompt([('class:prompt', 'User: ')])
 
-            for message in self.continue_chat(user_input):
+            for message in self.chat(user_input):
                 self._log_message(message)
 
 
