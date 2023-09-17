@@ -47,7 +47,9 @@ class CLIAgent(UtilityAgent):
             histfile = os.path.join(hist_path, agent_filename)
             self.prompt_session = PromptSession(history=FileHistory(histfile), style=style)
 
-        self.register_callable_methods(["show_function_calls", "hide_function_calls", "exit"])
+        self.register_callable_functions({"show_function_calls": self.show_function_calls, 
+                                          "hide_function_calls": self.hide_function_calls, 
+                                          "exit": self.exit})
 
         os.environ["SHOW_FUNCTION_CALLS"] = 'False'
 

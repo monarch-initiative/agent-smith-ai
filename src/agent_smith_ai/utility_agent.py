@@ -60,10 +60,10 @@ class UtilityAgent:
         self.history = None
     
         self.api_set = APIWrapperSet([])
-        self.callable_methods = []
+        self.callable_functions = {}
 
         self.function_schema_tokens = None # to be computed later if needed by _count_function_schema_tokens, which costs a couple of messages and is cached; being lazy speeds up agent initialization
-        self.register_callable_methods(["time", "help"])
+        self.register_callable_functions({"time": self.time, "help": self.help})
 
         self.token_bucket = TokenBucket(tokens = max_tokens, refill_rate = token_refill_rate)
         self.check_toxicity = check_toxicity
@@ -92,13 +92,14 @@ class UtilityAgent:
         self.api_set.add_api(name, spec_url, base_url, callable_endpoints)
 
 
-    def register_callable_methods(self, method_names: List[str]) -> None:
+    def register_callable_functions(self, functions: Dict[str, Callable]) -> None:
         """Registers methods with the agent. The agent will be able to call these methods.
         
         Args:
             method_names (List[str]): A list of method names that the agent can call."""
-        for method_name in method_names:
-            self.callable_methods.append(method_name)
+        for func_name in functions.keys():
+            func = functions[func_name]
+            self.callable_functions[func_name] = func
 
 
 
@@ -209,11 +210,12 @@ class UtilityAgent:
         
         Returns:
             A list of schemas for the agent's callable methods."""
-        methods = inspect.getmembers(self, predicate=inspect.ismethod)
-        return [_generate_schema(m[1]) for m in methods if m[0] in self.callable_methods]
+        # methods = inspect.getmembers(self, predicate=inspect.ismethod)
+        # return [_generate_schema(m[1]) for m in methods if m[0] in self.callable_functions]
 
+        return [_generate_schema(self.callable_functions[m]) for m in self.callable_functions.keys()]
 
-    def _call_method(self, method_name: str, params: dict) -> Generator[Message, None, None]:
+    def _call_function(self, func_name: str, params: dict) -> Generator[Message, None, None]:
         """Calls one of the agent's callable methods.
         
         Args:
@@ -222,15 +224,15 @@ class UtilityAgent:
             
         Yields:
             One or more messages containing the result of the method call."""
-        method = getattr(self, method_name, None)
-        if method is not None and callable(method):
-            result = method(**params)
+        func = self.callable_functions.get(func_name, None)
+        if func is not None and callable(func):
+            result = func(**params)
             if inspect.isgenerator(result):
                 yield from result
             else:
                 yield result
         else:
-            raise ValueError(f"No such method: {method_name}")
+            raise ValueError(f"No such function: {func_name}")
 
 
     def _count_history_tokens(self) -> int:
@@ -380,13 +382,13 @@ class UtilityAgent:
                                       is_function_call = False)
             
             ## if its not an API call, maybe it's one of the local callable methods
-            elif func_name in self.callable_methods:
+            elif func_name in self.callable_functions:
                 try:
                     # call_method is a generator, even if the method it's calling is not
                     # but if the method being called is a generator, it yields from the called generator
                     # so regardless, we are looping over results, checking each to see if the result is 
                     # already a message (as will happen in the case of a method that calls a sub-agent)
-                    func_result = self._call_method(func_name, func_arguments)
+                    func_result = self._call_function(func_name, func_arguments)
                     for potential_message in func_result:
                         # if it is a message already, just yield it to the stream
                         if isinstance(potential_message, Message):

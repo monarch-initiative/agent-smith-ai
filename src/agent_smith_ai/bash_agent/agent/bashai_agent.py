@@ -7,7 +7,7 @@ class BashAIAgent(UtilityAgent):
         super().__init__(name, system_prompt, model="gpt-3.5-turbo-0613", openai_api_key = api_key)
 
         # Register callable methods specific to bash interaction
-        self.register_callable_methods(['execute_bash_command'])
+        self.register_callable_functions({'execute_bash_command': self.execute_bash_command})
 
     def execute_bash_command(self, command: str):
         """Execute a bash command and return the result.

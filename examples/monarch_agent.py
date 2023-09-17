@@ -50,7 +50,7 @@ class MonarchAgent(UtilityAgent):
                                                 'get_phenotype_disease_associations'])
 
         ## the agent can also call local methods, but we have to register them
-        self.register_callable_methods(['compute_entropy'])
+        self.register_callable_functions({'compute_entropy': self.compute_entropy})
 
     ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
     def compute_entropy(self, items: Dict[Any, int]) -> float:
