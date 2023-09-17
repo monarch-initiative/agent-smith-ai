@@ -19,6 +19,7 @@ dotenv.load_dotenv()          # load env variables defined in .env file (if any)
 sv.initialize_app_config(
     page_title = "Monarch Assistant",
     page_icon = "https://avatars.githubusercontent.com/u/5161984?s=200&v=4",
+    initial_sidebar_state = "collapsed", # or "expanded"
     menu_items = {
             "Get Help": "https://github.com/monarch-initiative/agent-smith-ai/issues",
             "Report a Bug": "https://github.com/monarch-initiative/agent-smith-ai/issues",
@@ -28,7 +29,6 @@ sv.initialize_app_config(
 
 # define a function that returns a dictionary of agents to serve
 def get_agents():
-    # add some useful agents
     return {
         "Monarch Assistant": {
             "agent": MonarchAgent("Monarch Assistant", model="gpt-3.5-turbo-16k-0613"),
