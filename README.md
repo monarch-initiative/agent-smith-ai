@@ -234,12 +234,21 @@ sv.serve_app()
 
 To run the app, install `streamlit` and run `streamlit run examples/streamlit_app.py`. Messages are logged as they are generated and associated with session IDs for conversation tracking.
 
-**A note on streamlit**: streamlit is a UI framework designed to make it easy to develop and deploy web applications. Its execution model
+### Notes on streamlit
+
+[Streamlit](https://streamlit.io/) is a framework designed to make it easy to develop and deploy python-based web applications. Its execution model
 involves re-running the entire python script every time the UI changes or an action is taken, using deliberate state tracking and making heavy use of caching for efficiency. Beware of this if attempting to do extra work as part of the main application.
 
 It is also easy to publish your streamit app to their [community cloud](https://docs.streamlit.io/streamlit-community-cloud/deploy-your-app). 
 Note that at this time the application does not handle user authentication or rate-limiting of any kind.
 
+You may want to add a `.streamlit/config.toml` in the same directory as your app to adjust the default theme settings:
+
+```
+[theme]
+base = "light"
+primaryColor = "#4bbdff"
+```
 
 ## Additional Experiments and Examples
 
