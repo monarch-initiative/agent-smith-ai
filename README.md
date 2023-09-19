@@ -10,6 +10,7 @@ Current features:
 * An optional token-bucket allows built-in rate-limiting.
 * A basic, easy-to-deploy streamlit-based UI.
 
+An example of use of this tool is the [Monarch Assistant](https://github.com/monarch-initiative/monarch-assistant)
 
 <!-- <img src="https://imgix.bustle.com/uploads/image/2021/12/7/cc0e73f8-0020-4c7f-9564-da20f309622d-agent-smith.jpg?w=350" alt="Agent Smith Matrix" style="align: center;" />  -->
 
