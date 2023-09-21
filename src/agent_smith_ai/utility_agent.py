@@ -3,6 +3,7 @@ from datetime import datetime
 import inspect
 import os
 import json
+import traceback
 from typing import Any, Dict, List, Union, Literal, get_args, get_origin, Generator, Callable
 
 # Third party imports
@@ -160,7 +161,7 @@ class UtilityAgent:
                 self.history.messages.append(message)
                 yield from self._summarize_if_necessary()
         except Exception as e:
-            yield Message(role = "assistant", content = f"Error in new chat creation: {str(e)}", author = "System", intended_recipient = author)
+            yield Message(role = "assistant", content = f"Error in message processing: {str(e)}. Full Traceback: {traceback.format_exc()}", author = "System", intended_recipient = author)
 
 
     def clear_history(self):

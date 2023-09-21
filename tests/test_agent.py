@@ -14,10 +14,20 @@ class ExampleAgent(UtilityAgent):
 
 
         self.register_api("monarch", "https://oai-monarch-plugin.monarchinitiative.org/openapi.json", "https://oai-monarch-plugin.monarchinitiative.org")
-        self.register_callable_functions({"sing_a_song": self.sing_a_song, "run_timer": self.run_timer})
+        self.register_callable_functions({"sing_a_song": self.sing_a_song, "run_timer": self.run_timer, "throw_error": self.throw_error})
 
 
-    def sing_a_song(self):
+    def throw_error(self) -> None:
+        """Throws an error for testing purposes.
+        
+        Raises:
+            Exception: This is a test error.
+            
+        Returns:
+            None"""
+        raise Exception("This is a test error.")
+
+    def sing_a_song(self) -> str:
         """
         Sings a song.
 
@@ -44,6 +54,14 @@ class ExampleAgent(UtilityAgent):
             time.sleep(1)
             yield agent.chat("Please report the current time again.")
 
+
+def test_throw_error():
+
+    agent = ExampleAgent()
+
+    messages = list(agent.chat("Throw an error please"))
+    last_message = messages[-1]
+    assert "Full Traceback:" in last_message.content
 
 def test_example_agent():
     agent = ExampleAgent()
