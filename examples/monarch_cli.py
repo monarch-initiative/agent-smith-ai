@@ -43,10 +43,6 @@ class MonarchAgent(CLIAgent):
         # let's also show the function calls and results behind the scenes as they happen (inherited from CLIAgent)
         self.show_function_calls()
 
-    def throw_error(self, message) -> str:
-        """Throws an error for debugging purposes."""
-        raise Exception("testing!")
-
 
     ## Callable methods should be type-annotated and well-documented with docstrings parsable by the docstring_parser library
     ## try asking something like "What is the entropy of a standard tile set in Scrabble?"
