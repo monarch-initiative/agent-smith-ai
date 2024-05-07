@@ -301,9 +301,10 @@ class UtilityAgent:
             author = new_user_message.author
 
             num_tokens = _num_tokens_from_messages(self._reserialize_history(), model = self.model) + self._count_function_schema_tokens()
-            if num_tokens > _context_size(self.model) - self.auto_summarize:
+            context_size = _context_size(self.model)
+            if num_tokens > context_size - self.auto_summarize:
                 if not self.summarize_quietly:
-                    yield Message(role = "assistant", content = "I'm sorry, this conversation is getting too long for me to remember fully. I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
+                    yield Message(role = "assistant", content = f"I'm sorry, this conversation is getting too long for me to remember fully. My context size is only {context_size} tokens, but our conversation is currently {num_tokens} (and I've been instructed to leave a buffer of {self.auto_summarize}). I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
 
                 summary_agent = UtilityAgent(name = "Summarizer", model = self.model, auto_summarize_buffer_tokens = None)
                 summary_agent.history.messages = [message for message in self.history.messages]
