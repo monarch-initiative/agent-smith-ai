@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "agent_smith_ai"
-version = "1.0.1"
+version = "1.1.1"
 description = "agent-smith-ai"
 authors = ["Shawn T. O'Neil <shawn@tislab.org>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
+python = ">=3.9,<3.9.7 || >3.9.7,<3.10"
 click = "*"
 importlib-metadata = "^4.8.0"
 pytest = "^7.3.1"
