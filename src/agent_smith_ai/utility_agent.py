@@ -307,10 +307,10 @@ class UtilityAgent:
                     yield Message(role = "assistant", content = f"I'm sorry, this conversation is getting too long for me to remember fully. My context size is only {context_size} tokens, but our conversation is currently {num_tokens} (and I've been instructed to leave a buffer of {self.auto_summarize}). I'll be continuing from the following summary:", author = self.name, intended_recipient = author)
 
                 summary_agent = UtilityAgent(name = "Summarizer", model = self.model, auto_summarize_buffer_tokens = None)
+                summary_agent.history = Chat(messages = []) # generate an empty history to copy the messages into
                 summary_agent.history.messages = [message for message in self.history.messages]
-                summary_str = list(summary_agent.continue_chat(new_user_message = "Please summarize our conversation so far. The goal is to be able to continue our conversation from the summary only. Do not editorialize or ask any questions.", 
-                                                      author = author))[0].content
-                
+                summary_str = list(summary_agent.chat("Please summarize our conversation so far. The goal is to be able to continue our conversation from the summary only. Do not editorialize or ask any questions."))[0].content
+
                 self.history.messages = [self.history.messages[0]] # reset with the system prompt
                 # modify the last message to include the summary 
                 new_user_message.content = "Here is a summary of our conversation thus far:\n\n" + summary_str + "\n\nNow, please respond to the following as if we were continuing the conversation naturally:\n\n" + new_user_message.content
