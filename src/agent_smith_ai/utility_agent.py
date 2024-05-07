@@ -567,14 +567,43 @@ def _context_size(model: str = "gpt-3.5-turbo-0613") -> int:
         
     Returns:
         int: The context size for the given model."""
-    if "gpt-4" in model and "32k" in model:
+
+    if model in ['gpt-4-turbo', 
+                 'gpt-4-turbo-2024-04-09',
+                 'gpt-4-turbo-preview',
+                 'gpt-4-0125-preview',
+                 'gpt-4-1106-preview',
+                 'gpt-4-vision-preview',
+                 'gpt-4-1106-vision-preview',
+                 ]:
+        return 128000
+
+    elif model in ['gpt-4-32k',
+                   'gpt-4-32k-0613',
+                  ]:
         return 32768
-    elif "gpt-4" in model:
+
+    elif model in ['gpt-3.5-turbo-0125',
+                   'gpt-3.5-turbo',
+                   'gpt-3.5-turbo-1106',
+                   'gpt-3.5-turbo-16k',
+                   'gpt-3.5-turbo-16k-0613'
+                  ]:
+        return 16385
+
+    elif model in ['gpt-4',
+                   'gpt-4-0613',
+                  ]:
         return 8192
-    elif "gpt-3.5" in model and "16k" in model:
-        return 16384
+
+    elif model in ['gpt-3.5-turbo-instruct',
+                   'gpt-3.5-turbo-0613',
+                   ]:
+        return 4096
+
     else:
         return 4096
+
 
 ## Straight from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 def _num_tokens_from_messages(messages: List[Dict[str, Any]], model="gpt-3.5-turbo-0613") -> int:

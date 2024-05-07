@@ -729,6 +729,7 @@ User: Ok, show the function calls again, and tell me more about the CFTR gene.
 
 ## Changelog
 
+* 1.1.1: support new openai models (gpt-4-turbo et al)
 * 1.0.1: improved error logging
 * 1.0.0:
   * Replace .new_chat() and .continue_chat() with just chat()
